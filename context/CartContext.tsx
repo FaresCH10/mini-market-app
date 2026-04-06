@@ -95,9 +95,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
-      const formattedItems: CartItem[] = data.map((item) => {
-        const product = item.products?.[0];
-
+      const formattedItems: CartItem[] = (data || []).map((item: any) => {
+        const product = item.products; // products is now correctly fetched
         return {
           id: item.id,
           product_id: item.product_id,

@@ -4,7 +4,8 @@ import "./globals.css";
 import { Suspense } from "react";
 import ChatWidgetLoader from "@/components/ChatWidgetLoader";
 import { Inter } from "next/font/google";
-import { Providers } from "@/components/Providers";
+import { WalletProvider } from "@/context/WalletContext";
+import { CartProvider } from "@/context/CartContext";
 
 export const metadata = {
   title: "My App",
@@ -22,14 +23,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="font-sans">
-        <Providers>
-          <Suspense fallback={<div className="bg-gray-800 h-16" />}>
-            <Navbar />
-          </Suspense>
-          <main>{children}</main>
-          <Toaster position="bottom-right" />
-          <ChatWidgetLoader />
-        </Providers>
+        <WalletProvider>
+          <CartProvider>
+            <Suspense fallback={<div className="bg-gray-800 h-16" />}>
+              <Navbar />
+            </Suspense>
+            <main>{children}</main>
+            <Toaster position="bottom-right" />
+            <ChatWidgetLoader />
+          </CartProvider>
+        </WalletProvider>
       </body>
     </html>
   );
