@@ -5,21 +5,15 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { useWallet } from '@/context/WalletContext'
+import { useWallet } from "@/context/WalletContext";
 
 export default function CartPage() {
-  const {
-    items,
-    removeItem,
-    updateQuantity,
-    total,
-    clearCart,
-    loading,
-  } = useCart();
+  const { items, removeItem, updateQuantity, total, clearCart, loading } =
+    useCart();
   const [isDept, setIsDept] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
-  const { balance, refreshBalance } = useWallet(); 
+  const { balance, refreshBalance } = useWallet();
   const router = useRouter();
   const supabase = createClient();
 
@@ -28,7 +22,9 @@ export default function CartPage() {
   }, []);
 
   const fetchWalletBalance = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase
         .from("profiles")
@@ -41,7 +37,7 @@ export default function CartPage() {
 
   const handleUpdateQuantity = async (
     productId: string,
-    newQuantity: number
+    newQuantity: number,
   ) => {
     try {
       await updateQuantity(productId, newQuantity);
@@ -100,7 +96,7 @@ export default function CartPage() {
 
         if (product.quantity < item.quantity) {
           throw new Error(
-            `Not enough stock for ${product.name}. Available: ${product.quantity}`
+            `Not enough stock for ${product.name}. Available: ${product.quantity}`,
           );
         }
       }
@@ -108,7 +104,11 @@ export default function CartPage() {
       // Determine payment split
       const isFullyPaid = !isDept && walletBalance >= total;
       const paidAmount = isDept ? 0 : isFullyPaid ? total : walletBalance;
-      const debtAmount = isDept ? total : isFullyPaid ? 0 : total - walletBalance;
+      const debtAmount = isDept
+        ? total
+        : isFullyPaid
+          ? 0
+          : total - walletBalance;
 
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -150,6 +150,11 @@ export default function CartPage() {
           .eq("id", item.product_id)
           .single();
 
+        if (!product) {
+          console.error("Product not found");
+          return;
+        }
+
         const { error: updateError } = await supabase
           .from("products")
           .update({ quantity: product.quantity - item.quantity })
@@ -184,7 +189,7 @@ export default function CartPage() {
         toast.success(`Order placed! ${paidAmount}K L.L deducted from wallet.`);
       } else {
         toast.success(
-          `Order placed! ${paidAmount}K L.L paid from wallet, ${debtAmount}K L.L remaining as debt.`
+          `Order placed! ${paidAmount}K L.L paid from wallet, ${debtAmount}K L.L remaining as debt.`,
         );
       }
 
@@ -192,7 +197,6 @@ export default function CartPage() {
       setTimeout(() => {
         router.push("/profile");
       }, 1500);
-
     } catch (error: any) {
       console.error("Checkout error:", error);
       toast.error(error.message || "Something went wrong during checkout");
@@ -213,12 +217,26 @@ export default function CartPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center">
         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-          <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          <svg
+            className="w-10 h-10 text-gray-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+            />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-gray-800 mb-2">Your cart is empty</h2>
-        <p className="text-gray-400 text-sm mb-6">Add some products to get started</p>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">
+          Your cart is empty
+        </h2>
+        <p className="text-gray-400 text-sm mb-6">
+          Add some products to get started
+        </p>
         <Link
           href="/"
           className="inline-flex items-center gap-2 bg-[#000080] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1F51FF] transition-colors"
@@ -238,9 +256,14 @@ export default function CartPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
           Shopping Cart
-          <span className="ml-2 text-base font-medium text-gray-400">({items.length} items)</span>
+          <span className="ml-2 text-base font-medium text-gray-400">
+            ({items.length} items)
+          </span>
         </h1>
-        <Link href="/" className="text-sm text-[#000080] hover:underline flex items-center gap-1">
+        <Link
+          href="/"
+          className="text-sm text-[#000080] hover:underline flex items-center gap-1"
+        >
           ← Continue Shopping
         </Link>
       </div>
@@ -255,31 +278,55 @@ export default function CartPage() {
             >
               <div className="w-16 h-16 rounded-xl bg-gray-50 flex-shrink-0 overflow-hidden">
                 {item.image_url ? (
-                  <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <svg
+                      className="w-6 h-6 text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                   </div>
                 )}
               </div>
 
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
-                <p className="text-sm font-bold text-[#000080]">{item.price}K L.L</p>
+                <h3 className="font-semibold text-gray-900 truncate">
+                  {item.name}
+                </h3>
+                <p className="text-sm font-bold text-[#000080]">
+                  {item.price}K L.L
+                </p>
               </div>
 
               <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-1">
                 <button
-                  onClick={() => handleUpdateQuantity(item.product_id, item.quantity - 1)}
+                  onClick={() =>
+                    handleUpdateQuantity(item.product_id, item.quantity - 1)
+                  }
                   className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-red-500 transition-colors flex items-center justify-center"
                 >
                   −
                 </button>
-                <span className="w-8 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
+                <span className="w-8 text-center text-sm font-bold text-gray-900">
+                  {item.quantity}
+                </span>
                 <button
-                  onClick={() => handleUpdateQuantity(item.product_id, item.quantity + 1)}
+                  onClick={() =>
+                    handleUpdateQuantity(item.product_id, item.quantity + 1)
+                  }
                   className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-green-600 transition-colors flex items-center justify-center"
                 >
                   +
@@ -287,7 +334,9 @@ export default function CartPage() {
               </div>
 
               <div className="text-right shrink-0">
-                <p className="font-bold text-gray-900">{item.price * item.quantity}K L.L</p>
+                <p className="font-bold text-gray-900">
+                  {item.price * item.quantity}K L.L
+                </p>
                 <button
                   onClick={() => handleRemoveItem(item.product_id, item.name)}
                   className="text-xs text-red-400 hover:text-red-600 transition-colors mt-0.5"
@@ -306,13 +355,19 @@ export default function CartPage() {
 
             <div className="space-y-3 text-sm mb-4">
               <div className="flex justify-between text-gray-600">
-                <span>Subtotal ({items.reduce((s, i) => s + i.quantity, 0)} items)</span>
+                <span>
+                  Subtotal ({items.reduce((s, i) => s + i.quantity, 0)} items)
+                </span>
                 <span className="font-medium text-gray-900">{total}K L.L</span>
               </div>
 
               <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                <span className="font-medium text-gray-700">Wallet Balance</span>
-                <span className={`font-bold ${walletBalance > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <span className="font-medium text-gray-700">
+                  Wallet Balance
+                </span>
+                <span
+                  className={`font-bold ${walletBalance > 0 ? "text-emerald-600" : "text-red-500"}`}
+                >
                   {walletBalance}K L.L
                 </span>
               </div>
@@ -364,27 +419,27 @@ export default function CartPage() {
                 checkoutLoading || (walletBalance <= 0 && !isDept)
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                   : isDept || !hasEnoughWallet
-                  ? "bg-orange-500 hover:bg-orange-600 text-white active:scale-95"
-                  : "bg-[#000080] hover:bg-[#1F51FF] text-white active:scale-95"
+                    ? "bg-orange-500 hover:bg-orange-600 text-white active:scale-95"
+                    : "bg-[#000080] hover:bg-[#1F51FF] text-white active:scale-95"
               }`}
             >
               {checkoutLoading
                 ? "Processing..."
                 : isDept
-                ? "Confirm Debt Order"
-                : hasEnoughWallet
-                ? `Pay ${total}K L.L from Wallet`
-                : `Pay ${paidFromWallet}K L.L + ${debtAmount}K L.L Debt`}
+                  ? "Confirm Debt Order"
+                  : hasEnoughWallet
+                    ? `Pay ${total}K L.L from Wallet`
+                    : `Pay ${paidFromWallet}K L.L + ${debtAmount}K L.L Debt`}
             </button>
 
             <p className="text-xs text-gray-400 text-center mt-3 leading-relaxed">
               {isDept
                 ? "Pay in full when picking up."
                 : walletBalance <= 0
-                ? "Top up wallet or choose Pay Later."
-                : hasEnoughWallet
-                ? `${total}K L.L deducted from wallet.`
-                : `Wallet covers ${paidFromWallet}K L.L, ${debtAmount}K L.L as debt.`}
+                  ? "Top up wallet or choose Pay Later."
+                  : hasEnoughWallet
+                    ? `${total}K L.L deducted from wallet.`
+                    : `Wallet covers ${paidFromWallet}K L.L, ${debtAmount}K L.L as debt.`}
             </p>
           </div>
         </div>

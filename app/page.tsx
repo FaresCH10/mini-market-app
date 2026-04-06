@@ -5,9 +5,16 @@ import AddToCartButton from "@/components/AddToCartButton";
 import { useCart } from "@/context/CartContext";
 import { useEffect, useState } from "react";
 
+type Product = {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+};
+
 export default function Home() {
-  const [products, setProducts] = useState([]);
-  const [error, setError] = useState(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const { items, updateQuantity, removeItem } = useCart();
@@ -26,7 +33,11 @@ export default function Home() {
       if (error) throw error;
       setProducts(data || []);
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
@@ -53,13 +64,15 @@ export default function Home() {
   };
 
   const filtered = products.filter((p: any) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <p className="text-red-500">Error loading products. Please try again later.</p>
+        <p className="text-red-500">
+          Error loading products. Please try again later.
+        </p>
       </div>
     );
   }
@@ -71,16 +84,25 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-gray-900 mb-1">
           Welcome to <span className="text-[#000080]">NavyBits Market</span>
         </h1>
-        <p className="text-gray-500 text-sm">Browse and add products to your cart</p>
+        <p className="text-gray-500 text-sm">
+          Browse and add products to your cart
+        </p>
       </div>
 
       {/* Search */}
       <div className="relative mb-8 max-w-md">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
         </svg>
         <input
           type="text"
@@ -95,7 +117,10 @@ export default function Home() {
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse">
+            <div
+              key={i}
+              className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse"
+            >
               <div className="h-48 bg-gray-100" />
               <div className="p-4 space-y-3">
                 <div className="h-4 bg-gray-100 rounded w-3/4" />
@@ -113,13 +138,26 @@ export default function Home() {
           {filtered.length === 0 ? (
             <div className="text-center py-20">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  className="w-8 h-8 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
               </div>
               <p className="text-gray-500 font-medium">No products found</p>
               {search && (
-                <button onClick={() => setSearch("")} className="mt-2 text-sm text-[#000080] hover:underline">
+                <button
+                  onClick={() => setSearch("")}
+                  className="mt-2 text-sm text-[#000080] hover:underline"
+                >
                   Clear search
                 </button>
               )}
@@ -147,10 +185,22 @@ export default function Home() {
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full gap-2">
-                          <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <svg
+                            className="w-10 h-10 text-gray-300"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
                           </svg>
-                          <span className="text-xs text-gray-400">No image</span>
+                          <span className="text-xs text-gray-400">
+                            No image
+                          </span>
                         </div>
                       )}
                       {/* Stock badge */}
@@ -168,7 +218,9 @@ export default function Home() {
 
                     {/* Info */}
                     <div className="p-4 flex flex-col flex-1">
-                      <h2 className="font-semibold text-gray-900 mb-1 leading-tight">{product.name}</h2>
+                      <h2 className="font-semibold text-gray-900 mb-1 leading-tight">
+                        {product.name}
+                      </h2>
                       <p className="text-xl font-bold text-[#000080] mb-1">
                         {product.price}K L.L
                       </p>
