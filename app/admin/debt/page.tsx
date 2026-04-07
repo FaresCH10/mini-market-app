@@ -48,11 +48,40 @@ export default function DebtPage() {
     finally { setLoading(false); }
   };
 
+  const creditUserWallet = async (userId: string, amount: number) => {
+    if (amount <= 0) return;
+    const { data: profile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("wallet_balance")
+      .eq("id", userId)
+      .single();
+    if (fetchError) throw fetchError;
+
+    const currentBalance = profile?.wallet_balance || 0;
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ wallet_balance: currentBalance + amount })
+      .eq("id", userId);
+    if (updateError) throw updateError;
+  };
+
   const handleFullPayment = async (orderId: string, totalAmount: number) => {
+    const currentOrder = orders.find((o) => o.id === orderId);
+    if (!currentOrder) {
+      toast.error("Order not found");
+      return;
+    }
+    const paymentAmount = Math.max(0, totalAmount - (currentOrder.paid_amount || 0));
+    if (paymentAmount <= 0) {
+      toast.error("This order is already fully paid");
+      return;
+    }
+
     setProcessingId(orderId);
     try {
       const { error } = await supabase.from("orders").update({ payment_status: "paid", paid_amount: totalAmount, status: "completed" }).eq("id", orderId);
       if (error) throw error;
+      await creditUserWallet(currentOrder.user_id, paymentAmount);
       toast.success("Full payment recorded!");
       setOrders(prev => prev.filter(o => o.id !== orderId));
     } catch { toast.error("Failed to process payment"); }
@@ -73,6 +102,7 @@ export default function DebtPage() {
         status: isFullyPaid ? "completed" : "pending",
       }).eq("id", orderId);
       if (error) throw error;
+      await creditUserWallet(currentOrder.user_id, amount);
       if (isFullyPaid) {
         toast.success("Order fully paid!");
         setOrders(prev => prev.filter(o => o.id !== orderId));

@@ -17,6 +17,50 @@ function getSupabase() {
   return createClient(url, key);
 }
 
+async function applyTopUpToDebts(
+  supabase: ReturnType<typeof getSupabase>,
+  userId: string,
+  amount: number,
+) {
+  let remainingTopUp = amount;
+  let totalAppliedToDebt = 0;
+
+  const { data: debtOrders, error: debtFetchError } = await supabase
+    .from("orders")
+    .select("id, total_price, paid_amount")
+    .eq("user_id", userId)
+    .eq("type", "dept")
+    .neq("payment_status", "paid")
+    .order("created_at", { ascending: true });
+  if (debtFetchError) throw debtFetchError;
+
+  for (const order of debtOrders ?? []) {
+    if (remainingTopUp <= 0) break;
+    const paid = order.paid_amount ?? 0;
+    const remainingDebt = Math.max(0, order.total_price - paid);
+    if (remainingDebt <= 0) continue;
+
+    const payment = Math.min(remainingTopUp, remainingDebt);
+    const updatedPaid = paid + payment;
+    const isPaid = updatedPaid >= order.total_price;
+
+    const { error: debtUpdateError } = await supabase
+      .from("orders")
+      .update({
+        paid_amount: updatedPaid,
+        payment_status: isPaid ? "paid" : "partial",
+        status: isPaid ? "completed" : "pending",
+      })
+      .eq("id", order.id);
+    if (debtUpdateError) throw debtUpdateError;
+
+    remainingTopUp -= payment;
+    totalAppliedToDebt += payment;
+  }
+
+  return { totalAppliedToDebt };
+}
+
 // ─── Tool definitions ────────────────────────────────────────────────────────
 
 const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
@@ -141,7 +185,7 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
     function: {
       name: "confirm_purchase",
       description:
-        "Confirm purchase of all cart items. Type is 'purchase' (wallet) or 'dept' (debt).",
+        "Confirm purchase of all cart items using dynamic wallet/debt rules. Wallet is always charged; if total exceeds available wallet, remaining amount becomes debt and wallet can go negative.",
       parameters: {
         type: "object",
         properties: {
@@ -149,10 +193,10 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
             type: "string",
             enum: ["purchase", "dept"],
             description:
-              "'purchase' deducts from wallet, 'dept' records as debt",
+              "Optional legacy flag. Dynamic wallet/debt behavior is automatic regardless of this value.",
           },
         },
-        required: ["type"],
+        required: [],
       },
     },
   },
@@ -660,7 +704,6 @@ async function executeTool(
       }
 
       case "confirm_purchase": {
-        const { type } = args as { type: "purchase" | "dept" };
         const { data: cartItems, error: cartError } = await supabase
           .from("carts")
           .select("quantity, products(id, name, price, quantity)")
@@ -676,27 +719,28 @@ async function executeTool(
           0,
         );
 
-        if (type === "purchase") {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("wallet_balance")
-            .eq("id", userId)
-            .single();
-          if (((profile as { wallet_balance: number } | null)?.wallet_balance ?? 0) < total)
-            return JSON.stringify({
-              error: `Insufficient balance. Need ${fmt(total)}, have ${fmt((profile as { wallet_balance: number } | null)?.wallet_balance ?? 0)}`,
-            });
-        }
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("wallet_balance")
+          .eq("id", userId)
+          .single();
+        const walletBalance =
+          (profile as { wallet_balance: number } | null)?.wallet_balance ?? 0;
+        const availableWallet = Math.max(walletBalance, 0);
+        const paidAmount = Math.min(availableWallet, total);
+        const debtAmount = total - paidAmount;
+        const isFullyPaid = debtAmount === 0;
+        const orderType = isFullyPaid ? "purchase" : "dept";
 
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
             user_id: userId,
             total_price: total,
-            type,
-            status: type === "dept" ? "dept" : "completed",
-            payment_status: type === "dept" ? "pending" : "paid",
-            paid_amount: type === "purchase" ? total : 0,
+            type: orderType,
+            status: isFullyPaid ? "completed" : "pending",
+            payment_status: isFullyPaid ? "paid" : paidAmount > 0 ? "partial" : "pending",
+            paid_amount: paidAmount,
           })
           .select()
           .single();
@@ -722,18 +766,11 @@ async function executeTool(
           ),
         );
 
-        // Deduct wallet if purchase
-        if (type === "purchase") {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("wallet_balance")
-            .eq("id", userId)
-            .single();
-          await supabase
-            .from("profiles")
-            .update({ wallet_balance: ((profile as { wallet_balance: number } | null)?.wallet_balance ?? 0) - total })
-            .eq("id", userId);
-        }
+        // Always deduct full total from wallet (can become negative to reflect debt).
+        await supabase
+          .from("profiles")
+          .update({ wallet_balance: walletBalance - total })
+          .eq("id", userId);
 
         await supabase.from("carts").delete().eq("user_id", userId);
 
@@ -741,11 +778,11 @@ async function executeTool(
           success: true,
           order_id: (order as { id: string }).id,
           total: fmt(total),
-          type,
+          type: orderType,
           message:
-            type === "purchase"
+            isFullyPaid
               ? `Order confirmed! ${fmt(total)} deducted from your wallet.`
-              : `Order recorded as debt. Total owed: ${fmt(total)}.`,
+              : `Order confirmed! ${fmt(paidAmount)} paid from wallet and ${fmt(debtAmount)} added as debt.`,
         });
       }
 
@@ -767,7 +804,14 @@ async function executeTool(
           .single();
         if (fetchErr) throw fetchErr;
 
-        const newBalance = ((current as { wallet_balance: number }).wallet_balance ?? 0) + amount;
+        const currentBalance = (current as { wallet_balance: number }).wallet_balance ?? 0;
+        const newBalance = currentBalance + amount;
+
+        const { totalAppliedToDebt } = await applyTopUpToDebts(
+          supabase,
+          userId,
+          amount,
+        );
 
         const { error: updateErr } = await supabase
           .from("profiles")
@@ -778,8 +822,9 @@ async function executeTool(
         return JSON.stringify({
           success: true,
           added: fmt(amount),
+          debt_paid: fmt(totalAppliedToDebt),
           new_balance: fmt(newBalance),
-          message: `${fmt(amount)} added to your wallet. New balance: ${fmt(newBalance)}.`,
+          message: `${fmt(amount)} added. ${fmt(totalAppliedToDebt)} auto-paid toward debt. New balance: ${fmt(newBalance)}.`,
         });
       }
 
@@ -877,6 +922,13 @@ async function executeTool(
 
       case "admin_update_debt": {
         const { order_id, paid_amount, payment_status } = args as { order_id: string; paid_amount?: number; payment_status?: string };
+        const { data: beforeOrder, error: beforeErr } = await supabase
+          .from("orders")
+          .select("user_id, paid_amount")
+          .eq("id", order_id)
+          .single();
+        if (beforeErr) throw beforeErr;
+
         const updates: Record<string, unknown> = {};
         if (paid_amount !== undefined) updates.paid_amount = paid_amount;
         if (payment_status) updates.payment_status = payment_status;
@@ -887,6 +939,28 @@ async function executeTool(
           .select()
           .single();
         if (error) throw error;
+
+        // If paid_amount increased, mirror that payment to user's wallet balance.
+        const prevPaid = (beforeOrder as { paid_amount?: number }).paid_amount ?? 0;
+        const nextPaid = (data as { paid_amount?: number }).paid_amount ?? prevPaid;
+        const paidDelta = Math.max(0, nextPaid - prevPaid);
+        if (paidDelta > 0) {
+          const targetUserId = (beforeOrder as { user_id: string }).user_id;
+          const { data: currentWallet, error: walletFetchErr } = await supabase
+            .from("profiles")
+            .select("wallet_balance")
+            .eq("id", targetUserId)
+            .single();
+          if (walletFetchErr) throw walletFetchErr;
+
+          const currentBalance = (currentWallet as { wallet_balance?: number })?.wallet_balance ?? 0;
+          const { error: walletUpdateErr } = await supabase
+            .from("profiles")
+            .update({ wallet_balance: currentBalance + paidDelta })
+            .eq("id", targetUserId);
+          if (walletUpdateErr) throw walletUpdateErr;
+        }
+
         return JSON.stringify({ success: true, order: data });
       }
 
@@ -964,11 +1038,19 @@ async function executeTool(
         if (amount <= 0) return JSON.stringify({ error: "Amount must be greater than 0." });
         const { data: current, error: fetchErr } = await supabase
           .from("profiles")
-          .select("name, wallet_balance")
+          .select("id, name, wallet_balance")
           .eq("email", email)
           .single();
         if (fetchErr) throw fetchErr;
-        const newBalance = ((current as { wallet_balance: number }).wallet_balance ?? 0) + amount;
+        const currentBalance = (current as { wallet_balance: number }).wallet_balance ?? 0;
+        const newBalance = currentBalance + amount;
+
+        const { totalAppliedToDebt } = await applyTopUpToDebts(
+          supabase,
+          (current as { id: string }).id,
+          amount,
+        );
+
         const { error: updateErr } = await supabase
           .from("profiles")
           .update({ wallet_balance: newBalance })
@@ -978,6 +1060,7 @@ async function executeTool(
           success: true,
           user: (current as { name: string }).name,
           added: fmt(amount),
+          debt_paid: fmt(totalAppliedToDebt),
           new_balance: fmt(newBalance),
         });
       }
@@ -994,6 +1077,28 @@ async function executeTool(
 
       case "admin_update_user_wallet": {
         const { email, wallet_balance } = args as { email: string; wallet_balance: number };
+        const { data: userWithId, error: userFetchError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .single();
+        if (userFetchError) throw userFetchError;
+
+        const { data: unpaidDebt, error: debtCheckError } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("user_id", (userWithId as { id: string }).id)
+          .eq("type", "dept")
+          .neq("payment_status", "paid")
+          .limit(1);
+        if (debtCheckError) throw debtCheckError;
+        if ((unpaidDebt ?? []).length > 0) {
+          return JSON.stringify({
+            error:
+              "Cannot edit wallet directly while user has unpaid debt. Use admin_update_debt or admin_top_up_user_wallet.",
+          });
+        }
+
         const { data, error } = await supabase
           .from("profiles")
           .update({ wallet_balance })
@@ -1061,11 +1166,13 @@ PERSONAL (your own account, same as any user):
 - Browse products: get_products
 - Your cart: get_cart, get_products then add_to_cart (use product_id or product_name from the list), empty_cart (clear all), update_cart_quantity, decrease_cart_quantity, remove_from_cart
 - Your wallet: get_wallet, top_up_wallet, check_wallet_for_product
-- Place order: confirm_purchase (purchase=wallet, dept=debt)
+- Place order: confirm_purchase (dynamic: wallet is charged automatically; missing amount becomes debt)
 - Your orders: get_my_orders
 
 NAVIGATION: Use admin_navigate_to for admin pages (/admin, /admin/products, /admin/orders, /admin/wallets, /admin/debt, /admin/users) and navigate_to for user pages (/, /cart, /profile). ALWAYS navigate when a page is mentioned.
 
+Wallet policy: wallet can be negative (debt). Top-ups auto-pay debt orders oldest-first. When recording debt payment (admin_update_debt), paid amount is mirrored to user wallet.
+Do not use admin_update_user_wallet for users with unpaid debt; use admin_update_debt or admin_top_up_user_wallet instead.
 Always confirm before deleting products or changing user roles. Be concise and professional.
 NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Use names, emails, dates, and amounts only.`
       : `You are a friendly shopping assistant for NavyBits Market.
@@ -1081,10 +1188,11 @@ YOUR FULL CAPABILITIES:
 - Products: get_products (browse the store)
 - Cart: get_products (always call this before add_to_cart), add_to_cart with product_id OR product_name from that list, empty_cart to clear everything, get_cart, update_cart_quantity, decrease_cart_quantity, remove_from_cart — for removals call get_cart for product_id
 - Wallet: get_wallet, check_wallet_for_product, top_up_wallet
-- Orders: confirm_purchase (type: purchase=wallet, dept=debt), get_my_orders
+- Orders: confirm_purchase (dynamic wallet/debt), get_my_orders
 - Navigation: navigate_to any page
 
-Be friendly and proactive. Warn if stock is low or wallet is insufficient. Always confirm before placing orders.
+Wallet policy: purchases always deduct wallet; if wallet is insufficient, remaining amount becomes debt and wallet may go negative. Top-ups auto-pay debt oldest-first.
+Be friendly and proactive. Warn if stock is low. Always confirm before placing orders.
 NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Use names, prices, dates, and quantities only.`;
 
     const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [

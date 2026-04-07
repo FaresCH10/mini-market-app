@@ -42,6 +42,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
   }, [isOpen]);
 
   if (!isOpen) return null;
+  const isInDebt = currentAmount < 0;
 
   const addMoney = async () => {
     const addAmount = parseFloat(amount);
@@ -61,7 +62,43 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
         .eq("id", user.id)
         .single();
 
-      const newBalance = (profile?.wallet_balance || 0) + addAmount;
+      const currentBalance = profile?.wallet_balance || 0;
+      const newBalance = currentBalance + addAmount;
+
+      // Auto-pay pending debt orders (oldest first) when user recharges.
+      let remainingTopUp = addAmount;
+      const { data: debtOrders, error: debtFetchError } = await supabase
+        .from("orders")
+        .select("id, total_price, paid_amount")
+        .eq("user_id", user.id)
+        .eq("type", "dept")
+        .neq("payment_status", "paid")
+        .order("created_at", { ascending: true });
+
+      if (debtFetchError) throw debtFetchError;
+
+      for (const order of debtOrders ?? []) {
+        if (remainingTopUp <= 0) break;
+        const paid = order.paid_amount || 0;
+        const remainingDebt = Math.max(0, order.total_price - paid);
+        if (remainingDebt <= 0) continue;
+
+        const payment = Math.min(remainingTopUp, remainingDebt);
+        const updatedPaid = paid + payment;
+        const isPaid = updatedPaid >= order.total_price;
+
+        const { error: debtUpdateError } = await supabase
+          .from("orders")
+          .update({
+            paid_amount: updatedPaid,
+            payment_status: isPaid ? "paid" : "partial",
+            status: isPaid ? "completed" : "pending",
+          })
+          .eq("id", order.id);
+
+        if (debtUpdateError) throw debtUpdateError;
+        remainingTopUp -= payment;
+      }
 
       const { error } = await supabase
         .from("profiles")
@@ -91,7 +128,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
 
         {/* Header */}
-        <div className="bg-gradient-to-br from-[#000080] to-[#1F51FF] px-6 pt-6 pb-8 text-white">
+        <div className={`px-6 pt-6 pb-8 text-white ${isInDebt ? "bg-gradient-to-br from-red-700 to-red-500" : "bg-gradient-to-br from-[#000080] to-[#1F51FF]"}`}>
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-xs font-medium text-blue-200 uppercase tracking-wider mb-1">My Wallet</p>

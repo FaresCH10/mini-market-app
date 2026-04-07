@@ -19,6 +19,7 @@ export default function Navbar() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const { itemCount } = useCart();
   const { balance, refreshBalance } = useWallet();
+  const isWalletInDebt = balance < 0;
   const supabase = createClient();
 
   useEffect(() => {
@@ -130,7 +131,11 @@ export default function Navbar() {
               {logged && (
                 <button
                   onClick={() => setShowWalletModal(true)}
-                  className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-emerald-100 transition-all"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                    isWalletInDebt
+                      ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                  }`}
                 >
                   <IoWalletOutline size={15} />
                   {balance.toLocaleString()} K L.L
@@ -239,11 +244,15 @@ export default function Navbar() {
               {/* Wallet */}
               <button
                 onClick={() => { setShowWalletModal(true); setIsMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                  isWalletInDebt
+                    ? "text-red-700 bg-red-50 hover:bg-red-100"
+                    : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                }`}
               >
                 <IoWalletOutline size={18} />
                 <span>{balance.toLocaleString()} K L.L</span>
-                <span className="ml-auto text-xs text-emerald-500 font-medium">Wallet</span>
+                <span className={`ml-auto text-xs font-medium ${isWalletInDebt ? "text-red-500" : "text-emerald-500"}`}>Wallet</span>
               </button>
 
               {/* Profile */}

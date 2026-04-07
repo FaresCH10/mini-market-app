@@ -8,6 +8,7 @@ type Profile = { id: string; name: string; email: string; role: string; wallet_b
 
 export default function WalletsPage() {
   const [users, setUsers] = useState<Profile[]>([]);
+  const [debtUserIds, setDebtUserIds] = useState<string[]>([]);
   const [filtered, setFiltered] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -36,14 +37,24 @@ export default function WalletsPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("profiles").select("id, name, email, role, wallet_balance").order("name", { ascending: true });
+      const [{ data, error }, { data: debtOrders, error: debtError }] = await Promise.all([
+        supabase.from("profiles").select("id, name, email, role, wallet_balance").order("name", { ascending: true }),
+        supabase.from("orders").select("user_id").eq("type", "dept").neq("payment_status", "paid"),
+      ]);
       if (error) throw error;
+      if (debtError) throw debtError;
       setUsers(data || []);
+      const uniqueDebtUserIds = [...new Set((debtOrders || []).map((o) => o.user_id as string))];
+      setDebtUserIds(uniqueDebtUserIds);
     } catch { toast.error("Failed to load users"); }
     finally { setLoading(false); }
   };
 
   const saveBalance = async (userId: string) => {
+    if (debtUserIds.includes(userId)) {
+      toast.error("Cannot edit wallet while user has unpaid debt");
+      return;
+    }
     const newBalance = parseFloat(editValue);
     if (isNaN(newBalance) || newBalance < 0) { toast.error("Invalid balance"); return; }
     setSavingId(userId);
@@ -117,6 +128,7 @@ export default function WalletsPage() {
               {filtered.map((user) => {
                 const isEditing = editingId === user.id;
                 const isSaving = savingId === user.id;
+                const hasDebt = debtUserIds.includes(user.id);
                 const initials = (user.name || user.email || 'U').slice(0, 2).toUpperCase();
                 return (
                   <div key={user.id} className={`flex items-center gap-4 px-5 py-3.5 transition-colors ${isEditing ? 'bg-blue-50/50' : 'hover:bg-gray-50/50'}`}>
@@ -151,9 +163,15 @@ export default function WalletsPage() {
                     ) : (
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-sm text-emerald-700 min-w-[80px] text-right">{user.wallet_balance ?? 0}K L.L</span>
-                        <button onClick={() => { setEditingId(user.id); setEditValue(String(user.wallet_balance ?? 0)); }} className="px-3 py-1.5 rounded-lg bg-[#000080]/5 text-[#000080] border border-[#000080]/10 text-xs font-semibold hover:bg-[#000080]/10 transition-colors">
-                          Edit
-                        </button>
+                        {hasDebt ? (
+                          <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold">
+                            Has debt
+                          </span>
+                        ) : (
+                          <button onClick={() => { setEditingId(user.id); setEditValue(String(user.wallet_balance ?? 0)); }} className="px-3 py-1.5 rounded-lg bg-[#000080]/5 text-[#000080] border border-[#000080]/10 text-xs font-semibold hover:bg-[#000080]/10 transition-colors">
+                            Edit
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

@@ -10,10 +10,9 @@ import { useWallet } from "@/context/WalletContext";
 export default function CartPage() {
   const { items, removeItem, updateQuantity, total, clearCart, loading } =
     useCart();
-  const [isDept, setIsDept] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
-  const { balance, refreshBalance } = useWallet();
+  const { refreshBalance } = useWallet();
   const router = useRouter();
   const supabase = createClient();
 
@@ -74,13 +73,6 @@ export default function CartPage() {
         return;
       }
 
-      // Block checkout if wallet is empty and not paying as debt
-      if (walletBalance <= 0 && !isDept) {
-        toast.error("Your wallet is empty. Please top up or choose Pay Later.");
-        setCheckoutLoading(false);
-        return;
-      }
-
       // Verify stock
       for (const item of items) {
         const { data: product, error: fetchError } = await supabase
@@ -101,14 +93,11 @@ export default function CartPage() {
         }
       }
 
-      // Determine payment split
-      const isFullyPaid = !isDept && walletBalance >= total;
-      const paidAmount = isDept ? 0 : isFullyPaid ? total : walletBalance;
-      const debtAmount = isDept
-        ? total
-        : isFullyPaid
-          ? 0
-          : total - walletBalance;
+      // Determine payment split from current positive wallet funds.
+      const availableWallet = Math.max(walletBalance, 0);
+      const paidAmount = Math.min(availableWallet, total);
+      const debtAmount = total - paidAmount;
+      const isFullyPaid = debtAmount === 0;
 
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -118,7 +107,7 @@ export default function CartPage() {
           total_price: total,
           type: isFullyPaid ? "purchase" : "dept",
           status: isFullyPaid ? "completed" : "pending",
-          payment_status: isFullyPaid ? "paid" : isDept ? "pending" : "partial",
+          payment_status: isFullyPaid ? "paid" : paidAmount > 0 ? "partial" : "pending",
           paid_amount: paidAmount,
         })
         .select()
@@ -166,30 +155,27 @@ export default function CartPage() {
         }
       }
 
-      // Deduct from wallet only when not a full debt order
-      if (!isDept) {
-        const newWalletBalance = isFullyPaid ? walletBalance - total : 0;
-        const { error: walletError } = await supabase
-          .from("profiles")
-          .update({ wallet_balance: newWalletBalance })
-          .eq("id", user.id);
+      // Always deduct full order total from wallet.
+      // This allows balance to go negative and represent debt directly.
+      const newWalletBalance = walletBalance - total;
+      const { error: walletError } = await supabase
+        .from("profiles")
+        .update({ wallet_balance: newWalletBalance })
+        .eq("id", user.id);
 
-        if (walletError) {
-          console.error("Wallet error:", walletError);
-          throw walletError;
-        }
-        await refreshBalance();
+      if (walletError) {
+        console.error("Wallet error:", walletError);
+        throw walletError;
       }
+      await refreshBalance();
 
       await clearCart();
 
-      if (isDept) {
-        toast.success("Order placed as debt! You can pay when picking up.");
-      } else if (isFullyPaid) {
+      if (isFullyPaid) {
         toast.success(`Order placed! ${paidAmount}K L.L deducted from wallet.`);
       } else {
         toast.success(
-          `Order placed! ${paidAmount}K L.L paid from wallet, ${debtAmount}K L.L remaining as debt.`,
+          `Order placed! Wallet used ${paidAmount}K L.L, debt increased by ${debtAmount}K L.L.`,
         );
       }
 
@@ -248,8 +234,9 @@ export default function CartPage() {
   }
 
   const hasEnoughWallet = walletBalance >= total;
-  const debtAmount = Math.max(0, total - walletBalance);
-  const paidFromWallet = Math.min(walletBalance, total);
+  const availableWallet = Math.max(walletBalance, 0);
+  const debtAmount = Math.max(0, total - availableWallet);
+  const paidFromWallet = Math.min(availableWallet, total);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -372,7 +359,7 @@ export default function CartPage() {
                 </span>
               </div>
 
-              {walletBalance > 0 && !hasEnoughWallet && (
+              {!hasEnoughWallet && (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1.5">
                   <div className="flex justify-between text-emerald-700">
                     <span>Paid from wallet</span>
@@ -385,9 +372,9 @@ export default function CartPage() {
                 </div>
               )}
 
-              {walletBalance <= 0 && !isDept && (
+              {walletBalance <= 0 && (
                 <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-xs">
-                  Your wallet is empty. Enable Pay Later below.
+                  Your wallet is in debt. New orders will increase debt automatically.
                 </div>
               )}
 
@@ -397,49 +384,28 @@ export default function CartPage() {
               </div>
             </div>
 
-            {/* Pay Later checkbox — only when wallet is empty */}
-            {walletBalance <= 0 && (
-              <label className="flex items-center gap-3 cursor-pointer p-3 bg-orange-50 border border-orange-100 rounded-xl mb-4">
-                <input
-                  type="checkbox"
-                  checked={isDept}
-                  onChange={(e) => setIsDept(e.target.checked)}
-                  className="w-4 h-4 accent-orange-500"
-                />
-                <span className="text-sm font-medium text-orange-700">
-                  Pay later — I'll pay when picking up
-                </span>
-              </label>
-            )}
-
             <button
               onClick={handleCheckout}
-              disabled={checkoutLoading || (walletBalance <= 0 && !isDept)}
+              disabled={checkoutLoading}
               className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
-                checkoutLoading || (walletBalance <= 0 && !isDept)
+                checkoutLoading
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : isDept || !hasEnoughWallet
+                  : !hasEnoughWallet
                     ? "bg-orange-500 hover:bg-orange-600 text-white active:scale-95"
                     : "bg-[#000080] hover:bg-[#1F51FF] text-white active:scale-95"
               }`}
             >
               {checkoutLoading
                 ? "Processing..."
-                : isDept
-                  ? "Confirm Debt Order"
-                  : hasEnoughWallet
-                    ? `Pay ${total}K L.L from Wallet`
-                    : `Pay ${paidFromWallet}K L.L + ${debtAmount}K L.L Debt`}
+                : hasEnoughWallet
+                  ? `Pay ${total}K L.L from Wallet`
+                  : `Pay ${paidFromWallet}K L.L + ${debtAmount}K L.L Debt`}
             </button>
 
             <p className="text-xs text-gray-400 text-center mt-3 leading-relaxed">
-              {isDept
-                ? "Pay in full when picking up."
-                : walletBalance <= 0
-                  ? "Top up wallet or choose Pay Later."
-                  : hasEnoughWallet
-                    ? `${total}K L.L deducted from wallet.`
-                    : `Wallet covers ${paidFromWallet}K L.L, ${debtAmount}K L.L as debt.`}
+              {hasEnoughWallet
+                ? `${total}K L.L deducted from wallet.`
+                : `Wallet covers ${paidFromWallet}K L.L, ${debtAmount}K L.L added to debt.`}
             </p>
           </div>
         </div>
