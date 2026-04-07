@@ -9,6 +9,7 @@ type DebtOrder = { id: string; total_price: number; paid_amount: number; payment
 export default function DebtPage() {
   const [orders, setOrders] = useState<DebtOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<{ [key: string]: number }>({});
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function DebtPage() {
       if (!user) { router.push("/login"); return; }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (profile?.role !== "admin") { toast.error("Admin access only"); router.push("/"); return; }
+      setCurrentAdminId(user.id);
       await fetchDebtOrders();
     } catch { router.push("/"); }
   };
@@ -67,52 +69,74 @@ export default function DebtPage() {
 
   const handleFullPayment = async (orderId: string, totalAmount: number) => {
     const currentOrder = orders.find((o) => o.id === orderId);
-    if (!currentOrder) {
-      toast.error("Order not found");
+    if (!currentOrder) { toast.error("Order not found"); return; }
+    if (currentOrder.user_id === currentAdminId) {
+      toast.error("You cannot pay your own debt from this dashboard");
       return;
     }
-    const paymentAmount = Math.max(0, totalAmount - (currentOrder.paid_amount || 0));
-    if (paymentAmount <= 0) {
+
+    const remainingAmount = Math.max(0, totalAmount - (currentOrder.paid_amount || 0));
+    if (remainingAmount <= 0) {
       toast.error("This order is already fully paid");
       return;
     }
 
     setProcessingId(orderId);
     try {
-      const { error } = await supabase.from("orders").update({ payment_status: "paid", paid_amount: totalAmount, status: "completed" }).eq("id", orderId);
+      const { error } = await supabase
+        .from("orders")
+        .update({ payment_status: "paid", paid_amount: totalAmount, status: "completed" })
+        .eq("id", orderId);
       if (error) throw error;
-      await creditUserWallet(currentOrder.user_id, paymentAmount);
+
+      await creditUserWallet(currentOrder.user_id, remainingAmount);
       toast.success("Full payment recorded!");
-      setOrders(prev => prev.filter(o => o.id !== orderId));
-    } catch { toast.error("Failed to process payment"); }
-    finally { setProcessingId(null); }
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } catch {
+      toast.error("Failed to process payment");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handlePartialPayment = async (orderId: string, totalAmount: number) => {
     const amount = paymentAmount[orderId];
     if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
-    const currentOrder = orders.find(o => o.id === orderId);
+    const currentOrder = orders.find((o) => o.id === orderId);
     if (!currentOrder) { toast.error("Order not found"); return; }
-    const newPaid = (currentOrder?.paid_amount || 0) + amount;
+    if (currentOrder.user_id === currentAdminId) {
+      toast.error("You cannot pay your own debt from this dashboard");
+      return;
+    }
+
+    const newPaid = (currentOrder.paid_amount || 0) + amount;
     const isFullyPaid = newPaid >= totalAmount;
     setProcessingId(orderId);
     try {
-      const { error } = await supabase.from("orders").update({
-        paid_amount: newPaid,
-        payment_status: isFullyPaid ? "paid" : "partial",
-        status: isFullyPaid ? "completed" : "pending",
-      }).eq("id", orderId);
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          paid_amount: newPaid,
+          payment_status: isFullyPaid ? "paid" : "partial",
+          status: isFullyPaid ? "completed" : "pending",
+        })
+        .eq("id", orderId);
       if (error) throw error;
+
       await creditUserWallet(currentOrder.user_id, amount);
       if (isFullyPaid) {
         toast.success("Order fully paid!");
-        setOrders(prev => prev.filter(o => o.id !== orderId));
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
       } else {
         toast.success(`Payment of ${amount}K L.L recorded`);
         await fetchDebtOrders();
       }
-    } catch { toast.error("Failed to process payment"); }
-    finally { setProcessingId(null); setPaymentAmount(prev => ({ ...prev, [orderId]: 0 })); }
+    } catch {
+      toast.error("Failed to process payment");
+    } finally {
+      setProcessingId(null);
+      setPaymentAmount((prev) => ({ ...prev, [orderId]: 0 }));
+    }
   };
 
   const getRemaining = (order: DebtOrder) => order.total_price - (order.paid_amount || 0);
@@ -168,6 +192,7 @@ export default function DebtPage() {
             {orders.map(order => {
               const remaining = getRemaining(order);
               const isProcessing = processingId === order.id;
+              const isOwnDebt = order.user_id === currentAdminId;
               const paidPct = ((order.paid_amount || 0) / order.total_price) * 100;
               return (
                 <div key={order.id} className="bg-white rounded-2xl border border-orange-100 shadow-sm overflow-hidden">
@@ -216,35 +241,41 @@ export default function DebtPage() {
 
                   {/* Payment actions */}
                   <div className="px-5 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <button
-                        onClick={() => handleFullPayment(order.id, order.total_price)}
-                        disabled={isProcessing}
-                        className="py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                      >
-                        {isProcessing ? "Processing…" : `Pay Full (${remaining}K L.L)`}
-                      </button>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type="number" step="0.01" min="0.01" max={remaining}
-                            value={paymentAmount[order.id] || ""}
-                            onChange={e => setPaymentAmount({ ...paymentAmount, [order.id]: parseFloat(e.target.value) || 0 })}
-                            placeholder="Partial amount"
-                            disabled={isProcessing}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all pr-14"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">K L.L</span>
-                        </div>
-                        <button
-                          onClick={() => handlePartialPayment(order.id, order.total_price)}
-                          disabled={isProcessing || !paymentAmount[order.id] || paymentAmount[order.id] <= 0}
-                          className="px-4 py-2.5 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {isProcessing ? "…" : "Pay"}
-                        </button>
+                    {isOwnDebt ? (
+                      <div className="rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                        You cannot pay your own debt from this dashboard.
                       </div>
-                    </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <button
+                          onClick={() => handleFullPayment(order.id, order.total_price)}
+                          disabled={isProcessing}
+                          className="py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                        >
+                          {isProcessing ? "Processing…" : `Pay Full (${remaining}K L.L)`}
+                        </button>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="number" step="0.01" min="0.01" max={remaining}
+                              value={paymentAmount[order.id] || ""}
+                              onChange={e => setPaymentAmount({ ...paymentAmount, [order.id]: parseFloat(e.target.value) || 0 })}
+                              placeholder="Partial amount"
+                              disabled={isProcessing}
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all pr-14"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">K L.L</span>
+                          </div>
+                          <button
+                            onClick={() => handlePartialPayment(order.id, order.total_price)}
+                            disabled={isProcessing || !paymentAmount[order.id] || paymentAmount[order.id] <= 0}
+                            className="px-4 py-2.5 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isProcessing ? "…" : "Pay"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

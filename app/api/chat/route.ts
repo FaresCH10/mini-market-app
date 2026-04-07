@@ -862,7 +862,27 @@ async function executeTool(
           // keep order_id for potential debt updates but label it clearly
           return { order_id: id, ...rest, user: { name: (profile as Record<string,unknown>).name, email: (profile as Record<string,unknown>).email } };
         });
-        return JSON.stringify(enriched);
+        const cleanRows = enriched.map((o: Record<string, unknown>) => {
+          const orderItems = (o.order_items as Array<{ product_name: string; quantity: number }> | undefined) ?? [];
+          return {
+            customer_name: (o.user as Record<string, unknown>)?.name ?? "Unknown",
+            customer_email: (o.user as Record<string, unknown>)?.email ?? "",
+            total_price: fmt((o.total_price as number) ?? 0),
+            type: o.type,
+            status: o.status,
+            payment_status: o.payment_status,
+            paid_amount: fmt((o.paid_amount as number) ?? 0),
+            created_at: o.created_at,
+            items_count: orderItems.length,
+            items_preview: orderItems.slice(0, 3).map((i) => `${i.product_name} x${i.quantity}`).join(", "),
+            order_ref: (o.order_id as string)?.slice(0, 8),
+          };
+        });
+        return JSON.stringify({
+          title: "Recent orders",
+          total: cleanRows.length,
+          rows: cleanRows,
+        });
       }
 
       case "admin_add_product": {
@@ -965,6 +985,13 @@ async function executeTool(
       }
 
       case "admin_get_dashboard_stats": {
+        const now = new Date();
+        const revenueWindowStart = new Date(now);
+        revenueWindowStart.setHours(1, 0, 0, 0);
+        if (now.getHours() < 1) {
+          revenueWindowStart.setDate(revenueWindowStart.getDate() - 1);
+        }
+
         const [
           { count: totalProducts },
           { count: totalUsers },
@@ -972,13 +999,21 @@ async function executeTool(
         ] = await Promise.all([
           supabase.from("products").select("*", { count: "exact", head: true }),
           supabase.from("profiles").select("*", { count: "exact", head: true }),
-          supabase.from("orders").select("total_price, paid_amount, type, payment_status"),
+          supabase
+            .from("orders")
+            .select("total_price, paid_amount, type, payment_status, created_at"),
         ]);
 
-        const orders = (orderStats ?? []) as Array<{ total_price: number; paid_amount: number; type: string; payment_status: string }>;
+        const orders = (orderStats ?? []) as Array<{
+          total_price: number;
+          paid_amount: number;
+          type: string;
+          payment_status: string;
+          created_at: string;
+        }>;
         const totalOrders = orders.length;
         const revenue = orders
-          .filter((o) => o.payment_status === "paid")
+          .filter((o) => o.payment_status === "paid" && new Date(o.created_at) >= revenueWindowStart)
           .reduce((s, o) => s + o.total_price, 0);
         const outstandingDebt = orders
           .filter((o) => o.type === "dept" && o.payment_status !== "paid")
@@ -987,6 +1022,7 @@ async function executeTool(
 
         return JSON.stringify({
           total_revenue: fmt(revenue),
+          revenue_window_start: revenueWindowStart.toISOString(),
           outstanding_debt: fmt(outstandingDebt),
           total_orders: totalOrders,
           total_products: totalProducts ?? 0,
@@ -1001,7 +1037,17 @@ async function executeTool(
           .select("name, email, role, created_at")
           .order("created_at", { ascending: false });
         if (error) throw error;
-        return JSON.stringify(data);
+        const rows = (data ?? []).map((u: Record<string, unknown>) => ({
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          joined_at: u.created_at,
+        }));
+        return JSON.stringify({
+          title: "All users",
+          total: rows.length,
+          rows,
+        });
       }
 
       case "admin_toggle_user_role": {
@@ -1023,13 +1069,16 @@ async function executeTool(
           .order("wallet_balance", { ascending: false });
         if (error) throw error;
         const total = (data ?? []).reduce((s: number, p: Record<string, unknown>) => s + ((p.wallet_balance as number) ?? 0), 0);
-        return JSON.stringify({
-          users: (data ?? []).map((p: Record<string, unknown>) => ({
+        const rows = (data ?? []).map((p: Record<string, unknown>) => ({
             name: p.name,
             email: p.email,
             balance: fmt((p.wallet_balance as number) ?? 0),
-          })),
+          }));
+        return JSON.stringify({
+          title: "All wallets",
+          total_users: rows.length,
           total_funds: fmt(total),
+          rows,
         });
       }
 
@@ -1173,6 +1222,7 @@ NAVIGATION: Use admin_navigate_to for admin pages (/admin, /admin/products, /adm
 
 Wallet policy: wallet can be negative (debt). Top-ups auto-pay debt orders oldest-first. When recording debt payment (admin_update_debt), paid amount is mirrored to user wallet.
 Do not use admin_update_user_wallet for users with unpaid debt; use admin_update_debt or admin_top_up_user_wallet instead.
+When listing all orders/wallets/users, return a clean readable response with short bullet lines including names and key fields (avoid dumping raw JSON).
 Always confirm before deleting products or changing user roles. Be concise and professional.
 NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Use names, emails, dates, and amounts only.`
       : `You are a friendly shopping assistant for NavyBits Market.

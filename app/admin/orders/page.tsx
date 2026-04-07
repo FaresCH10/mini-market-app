@@ -14,6 +14,7 @@ const PAYMENT_BADGE: Record<string, string> = {
 };
 
 export default function OrdersPage() {
+  const PAGE_SIZE = 20;
   const [orders, setOrders] = useState<Order[]>([]);
   const [filtered, setFiltered] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,11 +22,13 @@ export default function OrdersPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => { checkAuthAndFetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { applyFilters(); }, [orders, typeFilter, statusFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setCurrentPage(1); }, [typeFilter, statusFilter, search]);
 
   const checkAuthAndFetch = async () => {
     try {
@@ -72,6 +75,10 @@ export default function OrdersPage() {
 
   const totalRevenue = orders.filter(o => o.payment_status === "paid").reduce((s, o) => s + o.total_price, 0);
   const pendingCount = orders.filter(o => o.payment_status !== "paid").length;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const paginatedOrders = filtered.slice(pageStart, pageStart + PAGE_SIZE);
 
   if (loading) return (
     <div>
@@ -127,7 +134,9 @@ export default function OrdersPage() {
           <option value="partial">Partial</option>
           <option value="pending">Pending</option>
         </select>
-        <span className="text-xs text-gray-400">{filtered.length} of {orders.length}</span>
+        <span className="text-xs text-gray-400">
+          {filtered.length} of {orders.length} • Page {safePage} / {totalPages}
+        </span>
       </div>
 
       {/* Orders */}
@@ -137,7 +146,7 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(order => {
+          {paginatedOrders.map(order => {
             const isExpanded = expandedId === order.id;
             const remaining = order.total_price - (order.paid_amount || 0);
             return (
@@ -186,6 +195,30 @@ export default function OrdersPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {filtered.length > PAGE_SIZE && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400">
+            Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

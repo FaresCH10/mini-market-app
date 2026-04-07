@@ -39,6 +39,14 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
+      const now = new Date()
+      const revenueWindowStart = new Date(now)
+      revenueWindowStart.setHours(1, 0, 0, 0)
+      // Between midnight and 00:59, use previous day's 1:00 AM as the reset point.
+      if (now.getHours() < 1) {
+        revenueWindowStart.setDate(revenueWindowStart.getDate() - 1)
+      }
+
       const [
         { count: productsCount },
         { count: usersCount },
@@ -52,7 +60,9 @@ export default function AdminDashboard() {
         supabase.from('orders').select('*', { count: 'exact', head: true }),
         supabase.from('orders').select('*', { count: 'exact', head: true })
           .eq('type', 'dept').neq('payment_status', 'paid'),
-        supabase.from('orders').select('total_price').eq('payment_status', 'paid'),
+        supabase.from('orders').select('total_price')
+          .eq('payment_status', 'paid')
+          .gte('created_at', revenueWindowStart.toISOString()),
         supabase.from('orders').select('total_price, paid_amount')
           .eq('type', 'dept').neq('payment_status', 'paid'),
       ])
@@ -81,7 +91,7 @@ export default function AdminDashboard() {
     {
       label: 'Total Revenue',
       value: `${stats.revenue}K L.L`,
-      sub: 'from paid orders',
+      sub: 'paid orders since 1:00 AM',
       href: '/admin/orders',
       color: 'from-emerald-500 to-emerald-600',
       icon: (
