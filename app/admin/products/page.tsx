@@ -10,6 +10,8 @@ type ImportedRow = { name: string; price: number; quantity: number; image_url?: 
 type ImportPreview = { valid: ImportedRow[]; errors: { row: number; reason: string }[] }
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all"
+const MARKET_LOGO_PLACEHOLDER = '/favicon.ico'
+const PRODUCT_IMAGES_BUCKET = 'product-images'
 
 export default function ManageProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -21,7 +23,9 @@ export default function ManageProducts() {
   const [showImport, setShowImport] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [importing, setImporting] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageUploadRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -140,6 +144,40 @@ export default function ManageProducts() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Products')
     XLSX.writeFile(wb, 'products_template.xlsx')
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImage(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('You must be logged in to upload images')
+
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const baseName = file.name.replace(/\.[^.]+$/, '')
+      const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '-')
+      const normalizedExt = ext === 'jpeg' ? 'jpg' : ext
+      const filePath = `products/${user.id}/${Date.now()}-${safeName}.${normalizedExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(PRODUCT_IMAGES_BUCKET)
+        .upload(filePath, file, { upsert: false, contentType: file.type || 'image/jpeg' })
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(filePath)
+      if (!data?.publicUrl) throw new Error('Failed to get public URL')
+
+      setFormData((prev) => ({ ...prev, image_url: data.publicUrl }))
+      toast.success('Image uploaded')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown upload error'
+      console.error('Image upload error:', error)
+      toast.error(`Image upload failed: ${message}`)
+    } finally {
+      setUploadingImage(false)
+      if (imageUploadRef.current) imageUploadRef.current.value = ''
+    }
   }
 
   if (!isAdmin) return null
@@ -274,6 +312,27 @@ export default function ManageProducts() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Image URL <span className="text-gray-400 font-normal">(optional)</span></label>
               <input type="url" value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} className={inputCls} placeholder="https://example.com/image.jpg" />
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => imageUploadRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                </button>
+                <input
+                  ref={imageUploadRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <span className="text-xs text-gray-400">or paste URL manually</span>
+              </div>
+              <div className="mt-2 w-16 h-16 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
+                <img src={formData.image_url || MARKET_LOGO_PLACEHOLDER} alt="Preview" className="w-full h-full object-cover" />
+              </div>
             </div>
             <div className="flex gap-2 pt-1">
               <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] transition-colors">
@@ -306,12 +365,7 @@ export default function ManageProducts() {
                 {product.image_url ? (
                   <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-300">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-xs">No image</span>
-                  </div>
+                  <img src={MARKET_LOGO_PLACEHOLDER} alt="Market logo" className="w-full h-full object-contain p-6 opacity-90" />
                 )}
                 {product.quantity === 0 && (
                   <span className="absolute top-2 right-2 bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full">Out of stock</span>
