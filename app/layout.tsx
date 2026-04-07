@@ -8,7 +8,7 @@ import { WalletProvider } from "@/context/WalletContext";
 import { CartProvider } from "@/context/CartContext";
 
 export const metadata = {
-  title: "My App",
+  title: "NavyBits Market",
   description: "Description here",
   metadataBase: new URL("https://yourdomain.com"),
 };
