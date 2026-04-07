@@ -92,6 +92,7 @@ export default function DebtPage() {
     const amount = paymentAmount[orderId];
     if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
     const currentOrder = orders.find(o => o.id === orderId);
+    if (!currentOrder) { toast.error("Order not found"); return; }
     const newPaid = (currentOrder?.paid_amount || 0) + amount;
     const isFullyPaid = newPaid >= totalAmount;
     setProcessingId(orderId);
