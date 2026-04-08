@@ -114,9 +114,9 @@ export default function ManageProducts() {
 
   const loadSheet = (wb: XLSX.WorkBook, sheetName: string) => {
     const sheet = wb.Sheets[sheetName]
-    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 })
+    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 })
     // First non-empty row as headers
-    const headers = (rows[0] as unknown[]).map(h => String(h ?? '').trim()).filter(Boolean)
+    const headers = (rows[0] ?? []).map(h => String(h ?? '').trim()).filter(Boolean)
     setSheetColumns(headers)
     setColumnMap(autoDetect(headers))
     setImportPreview(null)
