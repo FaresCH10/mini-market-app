@@ -4,7 +4,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import ChatWidgetLoader from "@/components/ChatWidgetLoader";
 import { Inter } from "next/font/google";
-import { WalletProvider } from "@/context/WalletContext";
+// import { WalletProvider } from "@/context/WalletContext";
 import { CartProvider } from "@/context/CartContext";
 
 export const metadata = {
@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="font-sans">
-        <WalletProvider>
+        {/* <WalletProvider> */}
           <CartProvider>
             <Suspense fallback={<div className="bg-gray-800 h-16" />}>
               <Navbar />
@@ -32,7 +32,7 @@ export default function RootLayout({
             <Toaster position="bottom-right" />
             <ChatWidgetLoader />
           </CartProvider>
-        </WalletProvider>
+        {/* </WalletProvider> */}
       </body>
     </html>
   );

@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx'
 type Product = { id: string; name: string; price: number; quantity: number; image_url: string }
 type ImportedRow = { name: string; price: number; quantity: number; image_url?: string }
 type ImportPreview = { valid: ImportedRow[]; errors: { row: number; reason: string }[] }
+type ColumnMap = { name: string; price: string; quantity: string }
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all"
 const MARKET_LOGO_PLACEHOLDER = '/favicon.ico'
@@ -23,6 +24,12 @@ export default function ManageProducts() {
   const [showImport, setShowImport] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [importing, setImporting] = useState(false)
+  const [aiParsing, setAiParsing] = useState(false)
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [sheetNames, setSheetNames] = useState<string[]>([])
+  const [selectedSheet, setSelectedSheet] = useState<string>('')
+  const [sheetColumns, setSheetColumns] = useState<string[]>([])
+  const [columnMap, setColumnMap] = useState<ColumnMap>({ name: '', price: '', quantity: '' })
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageUploadRef = useRef<HTMLInputElement>(null)
@@ -94,6 +101,27 @@ export default function ManageProducts() {
     setShowImport(false)
   }
 
+  // Auto-detect which column likely maps to each field
+  const autoDetect = (cols: string[]): ColumnMap => {
+    const find = (hints: string[]) =>
+      cols.find(c => hints.some(h => c.toLowerCase().replace(/[\s_-]/g, '').includes(h))) ?? ''
+    return {
+      name: find(['name', 'product', 'item', 'description', 'title', 'produit', 'article']),
+      price: find(['price', 'cost', 'unitprice', 'rate', 'prix', 'tarif', 'amount']),
+      quantity: find(['quantity', 'qty', 'stock', 'count', 'qte', 'quantite', 'units']),
+    }
+  }
+
+  const loadSheet = (wb: XLSX.WorkBook, sheetName: string) => {
+    const sheet = wb.Sheets[sheetName]
+    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 })
+    // First non-empty row as headers
+    const headers = (rows[0] as unknown[]).map(h => String(h ?? '').trim()).filter(Boolean)
+    setSheetColumns(headers)
+    setColumnMap(autoDetect(headers))
+    setImportPreview(null)
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -101,27 +129,70 @@ export default function ManageProducts() {
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-        const valid: ImportedRow[] = []
-        const errors: { row: number; reason: string }[] = []
-        rows.forEach((row, idx) => {
-          const rowNum = idx + 2
-          const n = Object.fromEntries(Object.entries(row).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, '_'), v]))
-          const name = String(n['name'] ?? '').trim()
-          const price = parseFloat(String(n['price'] ?? ''))
-          const quantity = parseInt(String(n['quantity'] ?? ''), 10)
-          const image_url = String(n['image_url'] ?? '').trim() || undefined
-          if (!name) { errors.push({ row: rowNum, reason: 'Missing name' }); return }
-          if (isNaN(price) || price < 0) { errors.push({ row: rowNum, reason: `Invalid price` }); return }
-          if (isNaN(quantity) || quantity < 0) { errors.push({ row: rowNum, reason: `Invalid quantity` }); return }
-          valid.push({ name, price, quantity, image_url })
-        })
-        setImportPreview({ valid, errors })
+        const wb = XLSX.read(data, { type: 'array' })
+        setWorkbook(wb)
+        setSheetNames(wb.SheetNames)
+        const first = wb.SheetNames[0]
+        setSelectedSheet(first)
+        loadSheet(wb, first)
       } catch { toast.error('Failed to parse file') }
     }
     reader.readAsArrayBuffer(file)
+  }
+
+  const handleSheetChange = (name: string) => {
+    setSelectedSheet(name)
+    if (workbook) loadSheet(workbook, name)
+  }
+
+  const buildPreview = () => {
+    if (!workbook || !selectedSheet) return
+    if (!columnMap.name || !columnMap.price || !columnMap.quantity) {
+      toast.error('Please map Name, Price, and Quantity columns')
+      return
+    }
+    const sheet = workbook.Sheets[selectedSheet]
+    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+    const valid: ImportedRow[] = []
+    const errors: { row: number; reason: string }[] = []
+    rows.forEach((row, idx) => {
+      const rowNum = idx + 2
+      const name = String(row[columnMap.name] ?? '').trim()
+      const price = parseFloat(String(row[columnMap.price] ?? ''))
+      const quantity = parseInt(String(row[columnMap.quantity] ?? ''), 10)
+      if (!name) { errors.push({ row: rowNum, reason: 'Missing name' }); return }
+      if (isNaN(price) || price < 0) { errors.push({ row: rowNum, reason: 'Invalid price' }); return }
+      if (isNaN(quantity) || quantity < 0) { errors.push({ row: rowNum, reason: 'Invalid quantity' }); return }
+      valid.push({ name, price, quantity })
+    })
+    setImportPreview({ valid, errors })
+  }
+
+  const parseWithAI = async () => {
+    if (!workbook || !selectedSheet) return
+    setAiParsing(true)
+    try {
+      const sheet = workbook.Sheets[selectedSheet]
+      const sheetCsv = XLSX.utils.sheet_to_csv(sheet)
+      const res = await fetch('/api/parse-excel-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheetCsv }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'AI parsing failed')
+      const products: ImportedRow[] = data.products
+      if (!products.length) {
+        toast.error('AI found no products in this sheet')
+        return
+      }
+      setImportPreview({ valid: products, errors: [] })
+      toast.success(`AI extracted ${products.length} products`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'AI parsing failed')
+    } finally {
+      setAiParsing(false)
+    }
   }
 
   const handleConfirmImport = async () => {
@@ -133,6 +204,11 @@ export default function ManageProducts() {
       toast.success(`${importPreview.valid.length} products imported!`)
       setImportPreview(null)
       setShowImport(false)
+      setWorkbook(null)
+      setSheetNames([])
+      setSelectedSheet('')
+      setSheetColumns([])
+      setColumnMap({ name: '', price: '', quantity: '' })
       if (fileInputRef.current) fileInputRef.current.value = ''
       fetchProducts()
     } catch { toast.error('Import failed') }
@@ -227,49 +303,198 @@ export default function ManageProducts() {
 
       {/* Import Panel */}
       {showImport && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-          <h2 className="font-bold text-gray-900 mb-1">Import from Excel</h2>
-          <p className="text-sm text-gray-500 mb-4">Columns: <code className="bg-gray-100 px-1 rounded text-xs">name</code>, <code className="bg-gray-100 px-1 rounded text-xs">price</code>, <code className="bg-gray-100 px-1 rounded text-xs">quantity</code>, <code className="bg-gray-100 px-1 rounded text-xs">image_url</code></p>
-          <div className="flex flex-wrap gap-3 mb-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-5">
+          <div>
+            <h2 className="font-bold text-gray-900">Import from Excel</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Supports multi-tab files. Pick a sheet, map the columns, then preview.</p>
+          </div>
+
+          {/* Step 1 — File picker */}
+          <div className="flex flex-wrap gap-3 items-center">
             <label className="cursor-pointer flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              Choose File
-              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+              {sheetNames.length ? 'Change File' : 'Choose File'}
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.ods" onChange={handleFileChange} className="hidden" />
             </label>
             <button onClick={downloadTemplate} className="text-sm text-[#000080] hover:underline font-medium">
               Download template →
             </button>
           </div>
 
+          {/* Step 2 — Sheet selector */}
+          {sheetNames.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sheet / Tab</label>
+              <div className="flex flex-wrap gap-2">
+                {sheetNames.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleSheetChange(s)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                      selectedSheet === s
+                        ? 'bg-[#000080] text-white border-[#000080]'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 — Column mapping */}
+          {sheetColumns.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Map Columns</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(['name', 'price', 'quantity'] as const).map(field => (
+                  <div key={field}>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 capitalize">
+                      {field} <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={columnMap[field]}
+                      onChange={e => setColumnMap(prev => ({ ...prev, [field]: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all bg-white"
+                    >
+                      <option value="">— select column —</option>
+                      {sheetColumns.map(col => (
+                        <option key={col} value={col}>{col}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <button
+                  onClick={buildPreview}
+                  disabled={!columnMap.name || !columnMap.price || !columnMap.quantity}
+                  className="px-4 py-2 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Preview Import
+                </button>
+                <span className="text-xs text-gray-400">or</span>
+                <button
+                  onClick={parseWithAI}
+                  disabled={aiParsing}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                >
+                  {aiParsing ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                      </svg>
+                      Parsing…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      Parse with AI
+                    </>
+                  )}
+                </button>
+                <span className="text-xs text-gray-400">AI works even without standard headers</span>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4 — Editable Preview */}
           {importPreview && (
             <div className="space-y-3">
               {importPreview.errors.length > 0 && (
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-                  <p className="font-semibold text-red-700 text-sm mb-2">{importPreview.errors.length} row(s) with errors:</p>
-                  <ul className="text-sm text-red-600 space-y-0.5">
+                  <p className="font-semibold text-red-700 text-sm mb-2">{importPreview.errors.length} row(s) skipped:</p>
+                  <ul className="text-sm text-red-600 space-y-0.5 max-h-32 overflow-y-auto">
                     {importPreview.errors.map(e => <li key={e.row}>Row {e.row}: {e.reason}</li>)}
                   </ul>
                 </div>
               )}
-              {importPreview.valid.length > 0 && (
+              {importPreview.valid.length > 0 ? (
                 <>
-                  <p className="text-sm font-semibold text-emerald-700">{importPreview.valid.length} product(s) ready to import</p>
-                  <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-emerald-700">{importPreview.valid.length} product(s) — edit any cell before importing</p>
+                    <button
+                      onClick={() => setImportPreview(prev => prev ? { ...prev, valid: [...prev.valid, { name: '', price: 0, quantity: 0 }] } : prev)}
+                      className="flex items-center gap-1 text-xs font-semibold text-[#000080] hover:underline"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add row
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border border-gray-100 max-h-72 overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-left">
+                      <thead className="bg-gray-50 text-left sticky top-0 z-10">
                         <tr>
-                          {['Name', 'Price', 'Qty', 'Image'].map(h => <th key={h} className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}
+                          <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                          <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Price (K L.L)</th>
+                          <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Qty</th>
+                          <th className="px-3 py-2.5 w-8" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {importPreview.valid.map((p, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-4 py-2.5 font-medium">{p.name}</td>
-                            <td className="px-4 py-2.5">{p.price}K L.L</td>
-                            <td className="px-4 py-2.5">{p.quantity}</td>
-                            <td className="px-4 py-2.5 text-gray-400 truncate max-w-[160px] text-xs">{p.image_url || '—'}</td>
+                          <tr key={i} className="group">
+                            <td className="px-2 py-1.5">
+                              <input
+                                type="text"
+                                value={p.name}
+                                onChange={e => setImportPreview(prev => {
+                                  if (!prev) return prev
+                                  const valid = [...prev.valid]
+                                  valid[i] = { ...valid[i], name: e.target.value }
+                                  return { ...prev, valid }
+                                })}
+                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#000080] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#000080]/20 transition-all"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.001"
+                                value={p.price}
+                                onChange={e => setImportPreview(prev => {
+                                  if (!prev) return prev
+                                  const valid = [...prev.valid]
+                                  valid[i] = { ...valid[i], price: parseFloat(e.target.value) || 0 }
+                                  return { ...prev, valid }
+                                })}
+                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#000080] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#000080]/20 transition-all"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <input
+                                type="number"
+                                min={0}
+                                value={p.quantity}
+                                onChange={e => setImportPreview(prev => {
+                                  if (!prev) return prev
+                                  const valid = [...prev.valid]
+                                  valid[i] = { ...valid[i], quantity: parseInt(e.target.value) || 0 }
+                                  return { ...prev, valid }
+                                })}
+                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#000080] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#000080]/20 transition-all"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <button
+                                onClick={() => setImportPreview(prev => prev ? { ...prev, valid: prev.valid.filter((_, idx) => idx !== i) } : prev)}
+                                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all p-1 rounded"
+                                title="Remove row"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -279,11 +504,21 @@ export default function ManageProducts() {
                     <button onClick={handleConfirmImport} disabled={importing} className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
                       {importing ? 'Importing…' : `Import ${importPreview.valid.length} Products`}
                     </button>
-                    <button onClick={() => { setImportPreview(null); setShowImport(false); if (fileInputRef.current) fileInputRef.current.value = '' }} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                    <button
+                      onClick={() => {
+                        setImportPreview(null); setShowImport(false); setWorkbook(null)
+                        setSheetNames([]); setSelectedSheet(''); setSheetColumns([])
+                        setColumnMap({ name: '', price: '', quantity: '' })
+                        if (fileInputRef.current) fileInputRef.current.value = ''
+                      }}
+                      className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
                       Cancel
                     </button>
                   </div>
                 </>
+              ) : (
+                <p className="text-sm text-gray-500">No valid rows found with the selected mapping.</p>
               )}
             </div>
           )}

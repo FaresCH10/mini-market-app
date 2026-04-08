@@ -5,21 +5,22 @@ import Link from "next/link";
 import AuthButton from "@/components/auth-button";
 import { FaShoppingBag, FaTimes } from "react-icons/fa";
 import { AiOutlineShoppingCart } from "react-icons/ai";
-import { IoWalletOutline } from "react-icons/io5";
-import WalletModal from "@/components/WalletModal";
+// import { IoWalletOutline } from "react-icons/io5";
+// import WalletModal from "@/components/WalletModal";
 import { useCart } from "@/context/CartContext";
-import { useWallet } from "@/context/WalletContext";
+// import { useWallet } from "@/context/WalletContext";
 
 export default function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showWalletModal, setShowWalletModal] = useState(false);
+  // const [showWalletModal, setShowWalletModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [logged, setLogged] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [debtCount, setDebtCount] = useState(0);
   const { itemCount } = useCart();
-  const { balance, refreshBalance } = useWallet();
-  const isWalletInDebt = balance < 0;
+  // const { balance, refreshBalance } = useWallet();
+  // const isWalletInDebt = balance < 0;
   const supabase = createClient();
 
   useEffect(() => {
@@ -36,13 +37,25 @@ export default function Navbar() {
       }
     };
 
+    const fetchDebtCount = async (userId: string) => {
+      const { count } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("type", "dept")
+        .neq("payment_status", "paid");
+      setDebtCount(count ?? 0);
+    };
+
     const handleUser = async (user: { id: string; email?: string } | null) => {
       setLogged(!!user);
       setUserEmail(user?.email ?? null);
       setIsAdmin(false);
+      setDebtCount(0);
       if (user) {
-        await refreshBalance();
+        // await refreshBalance();
         await checkAdminStatus(user.id);
+        await fetchDebtCount(user.id);
       }
       setLoadingAuth(false);
     };
@@ -116,6 +129,19 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
+              {logged && (
+                <Link
+                  href="/debt"
+                  className="relative px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-orange-500 hover:bg-orange-50 transition-all"
+                >
+                  My Debts
+                  {debtCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-orange-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                      {debtCount > 9 ? "9+" : debtCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {isAdmin && (
                 <Link
                   href="/admin"
@@ -128,7 +154,7 @@ export default function Navbar() {
 
             {/* Desktop Right */}
             <div className="hidden md:flex items-center gap-3">
-              {logged && (
+              {/* {logged && (
                 <button
                   onClick={() => setShowWalletModal(true)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
@@ -140,7 +166,7 @@ export default function Navbar() {
                   <IoWalletOutline size={15} />
                   {balance.toLocaleString()} K L.L
                 </button>
-              )}
+              )} */}
               <AuthButton />
             </div>
 
@@ -215,6 +241,24 @@ export default function Navbar() {
             )}
           </Link>
 
+          {logged && (
+            <Link
+              href="/debt"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-500 transition-colors"
+            >
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              My Debts
+              {debtCount > 0 && (
+                <span className="ml-auto bg-orange-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                  {debtCount}
+                </span>
+              )}
+            </Link>
+          )}
+
           {isAdmin && (
             <Link
               href="/admin"
@@ -242,7 +286,7 @@ export default function Navbar() {
               </div>
 
               {/* Wallet */}
-              <button
+              {/* <button
                 onClick={() => { setShowWalletModal(true); setIsMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
                   isWalletInDebt
@@ -253,7 +297,7 @@ export default function Navbar() {
                 <IoWalletOutline size={18} />
                 <span>{balance.toLocaleString()} K L.L</span>
                 <span className={`ml-auto text-xs font-medium ${isWalletInDebt ? "text-red-500" : "text-emerald-500"}`}>Wallet</span>
-              </button>
+              </button> */}
 
               {/* Profile */}
               <Link
@@ -293,11 +337,11 @@ export default function Navbar() {
         </div>
       </div>
 
-      <WalletModal
+      {/* <WalletModal
         isOpen={showWalletModal}
         onClose={() => setShowWalletModal(false)}
         onBalanceUpdate={() => { refreshBalance(); }}
-      />
+      /> */}
     </>
   );
 }

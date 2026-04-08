@@ -13,6 +13,12 @@ type Product = {
 };
 const MARKET_LOGO_PLACEHOLDER = "/favicon.ico";
 
+function safeImg(url: string | null | undefined): string {
+  if (!url || !url.trim()) return MARKET_LOGO_PLACEHOLDER;
+  if (url.startsWith("/")) return url;
+  try { new URL(url); return url; } catch { return MARKET_LOGO_PLACEHOLDER; }
+}
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -177,9 +183,9 @@ export default function Home() {
                   >
                     {/* Image */}
                     <div className="relative h-48 bg-gray-50">
-                      {product.image_url ? (
+                      {safeImg(product.image_url) !== MARKET_LOGO_PLACEHOLDER ? (
                         <Image
-                          src={product.image_url}
+                          src={safeImg(product.image_url)}
                           alt={product.name}
                           fill
                           className="object-cover"

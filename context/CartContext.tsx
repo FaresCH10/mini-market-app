@@ -63,17 +63,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Fetch cart from database when user changes
   useEffect(() => {
     if (userId) {
-      fetchCart();
+      fetchCart(true);
     } else {
       setItems([]);
       setLoading(false);
     }
   }, [userId]);
 
-  const fetchCart = async () => {
+  const fetchCart = async (showLoading = false) => {
     if (!userId) return;
 
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const { data, error } = await supabase
         .from("carts")
@@ -133,7 +133,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const existingItem = items.find((i) => i.product_id === product.id);
 
       if (existingItem) {
-        // Update quantity if item exists
         const newQuantity = existingItem.quantity + 1;
         const { error } = await supabase
           .from("carts")
@@ -142,8 +141,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           .eq("product_id", product.id);
 
         if (error) throw error;
+        setItems((prev) =>
+          prev.map((i) =>
+            i.product_id === product.id ? { ...i, quantity: newQuantity } : i,
+          ),
+        );
       } else {
-        // Insert new item
         const { error } = await supabase.from("carts").insert({
           user_id: userId,
           product_id: product.id,
@@ -151,9 +154,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (error) throw error;
+        // Need full product data for new items — silent fetch without loading flash
+        await fetchCart();
       }
-
-      await fetchCart(); // Refresh cart
     } catch (error) {
       console.error("Error adding to cart:", error);
       throw error;
@@ -171,8 +174,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         .eq("product_id", productId);
 
       if (error) throw error;
-
-      await fetchCart(); // Refresh cart
+      setItems((prev) => prev.filter((i) => i.product_id !== productId));
     } catch (error) {
       console.error("Error removing item:", error);
       throw error;
@@ -195,8 +197,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         .eq("product_id", productId);
 
       if (error) throw error;
-
-      await fetchCart(); // Refresh cart
+      setItems((prev) =>
+        prev.map((i) =>
+          i.product_id === productId ? { ...i, quantity } : i,
+        ),
+      );
     } catch (error) {
       console.error("Error updating quantity:", error);
       throw error;

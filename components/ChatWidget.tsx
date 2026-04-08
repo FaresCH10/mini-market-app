@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useWallet } from "@/context/WalletContext";
+// import { useWallet } from "@/context/WalletContext";
 import { useCart } from "@/context/CartContext";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -14,15 +14,15 @@ const USER_CHIPS = [
   "My cart",
   "Empty cart",
   "Remove from cart",
-  "My wallet",
+  "My debts",
   "My orders",
 ];
-const ADMIN_CHIPS = ["Dashboard stats", "All orders", "View debts", "All users", "All wallets"];
+const ADMIN_CHIPS = ["Dashboard stats", "All orders", "View debts", "All users"];
 
 function welcomeMsg(name: string, role: string) {
   return role === "admin"
     ? `Welcome back, **${name}**! You're logged in as **Admin**. How can I assist you today?`
-    : `Hi **${name}**! I'm your NavyBits assistant. Ask me about products, your cart, wallet, or orders!`;
+    : `Hi **${name}**! I'm your NavyBits assistant. Ask me about products, your cart, orders, or debts!`;
 }
 
 function renderText(text: string) {
@@ -120,7 +120,7 @@ export default function ChatWidget() {
   }, [open]);
 
   const router = useRouter();
-  const { refreshBalance } = useWallet();
+  // const { refreshBalance } = useWallet();
   const { refreshCart } = useCart();
 
   const sendMessage = useCallback(
@@ -159,9 +159,6 @@ export default function ChatWidget() {
         const data = await res.json() as { message?: string; error?: string; navigate_to?: string; refresh_cart?: boolean };
         setMessages((m) => [...m, { role: "assistant", content: data.message ?? data.error ?? "No response." }]);
 
-        // Refresh wallet balance (e.g. after top-up or purchase)
-        await refreshBalance();
-
         // Refresh cart badge if the bot mutated cart or confirmed an order
         if (data.refresh_cart) await refreshCart();
 
@@ -173,7 +170,7 @@ export default function ChatWidget() {
         setLoading(false);
       }
     },
-    [input, loading, userId, refreshBalance, refreshCart, router]
+    [input, loading, userId, refreshCart, router]
   );
 
   const isAdmin = profile?.role === "admin";
