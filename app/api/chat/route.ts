@@ -1165,8 +1165,10 @@ async function executeTool(
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Tool execution failed";
-    return JSON.stringify({ error: message });
+    console.error("[executeTool] Error:", err);
+    return JSON.stringify({
+      error: "Sorry — I couldn't complete that action. Please try again.",
+    });
   }
 }
 
@@ -1300,7 +1302,9 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
             }
 
             const content = parseFailed
-              ? JSON.stringify({ error: "Invalid tool arguments JSON." })
+              ? JSON.stringify({
+                error: "Sorry, I couldn't understand that request. Please try again.",
+              })
               : await executeTool(tc.function.name, args, userId, supabase);
             return {
               role: "tool" as const,
@@ -1331,7 +1335,11 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
     return NextResponse.json({ message: finalText, navigate_to: navigateTo, refresh_cart: refreshCart });
   } catch (err: unknown) {
     console.error("[/api/chat] Error:", err);
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Sorry — I couldn't complete that request. Please try again.",
+      },
+      { status: 500 },
+    );
   }
 }
