@@ -40,10 +40,14 @@ export default function CartPage() {
   const handleUpdateQuantity = async (
     productId: string,
     newQuantity: number,
+    stock: number,
   ) => {
+    if (newQuantity > stock) {
+      toast.error(`Only ${stock} in stock`);
+      return;
+    }
     try {
       await updateQuantity(productId, newQuantity);
-      toast.success("Cart updated");
     } catch (error) {
       toast.error("Failed to update quantity");
     }
@@ -73,6 +77,15 @@ export default function CartPage() {
 
       if (items.length === 0) {
         toast.error("Your cart is empty");
+        return;
+      }
+
+      // Quick client-side stock check before hitting the server
+      const overStock = items.filter((item) => item.quantity > item.stock);
+      if (overStock.length > 0) {
+        toast.error(
+          `Not enough stock for: ${overStock.map((i) => `${i.name} (max ${i.stock})`).join(", ")}`,
+        );
         return;
       }
 
@@ -294,26 +307,32 @@ export default function CartPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-1">
-                <button
-                  onClick={() =>
-                    handleUpdateQuantity(item.product_id, item.quantity - 1)
-                  }
-                  className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-red-500 transition-colors flex items-center justify-center"
-                >
-                  −
-                </button>
-                <span className="w-8 text-center text-sm font-bold text-gray-900">
-                  {item.quantity}
-                </span>
-                <button
-                  onClick={() =>
-                    handleUpdateQuantity(item.product_id, item.quantity + 1)
-                  }
-                  className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-green-600 transition-colors flex items-center justify-center"
-                >
-                  +
-                </button>
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-1">
+                  <button
+                    onClick={() =>
+                      handleUpdateQuantity(item.product_id, item.quantity - 1, item.stock)
+                    }
+                    className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-red-500 transition-colors flex items-center justify-center"
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center text-sm font-bold text-gray-900">
+                    {item.quantity}
+                  </span>
+                  <button
+                    onClick={() =>
+                      handleUpdateQuantity(item.product_id, item.quantity + 1, item.stock)
+                    }
+                    disabled={item.quantity >= item.stock}
+                    className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  >
+                    +
+                  </button>
+                </div>
+                {item.quantity >= item.stock && (
+                  <span className="text-[10px] text-orange-500 font-medium">Max stock</span>
+                )}
               </div>
 
               <div className="text-right shrink-0">

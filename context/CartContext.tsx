@@ -11,6 +11,7 @@ type CartItem = {
   name: string;
   price: number;
   quantity: number;
+  stock: number;
   image_url?: string;
 };
 
@@ -84,6 +85,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           products (
             name,
             price,
+            quantity,
             image_url
           )
         `,
@@ -96,13 +98,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
 
       const formattedItems: CartItem[] = (data || []).map((item: any) => {
-        const product = item.products; // products is now correctly fetched
+        const product = item.products;
         return {
           id: item.id,
           product_id: item.product_id,
           name: product?.name ?? "Unknown Product",
           price: product?.price ?? 0,
           quantity: item.quantity,
+          stock: product?.quantity ?? 0,
           image_url: product?.image_url ?? "",
         };
       });
