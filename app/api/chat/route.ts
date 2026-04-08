@@ -116,28 +116,24 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "confirm_purchase",
-      description: `Place an order for all cart items with a flexible payment split.
-- paid_now = cart total  →  full purchase (paid immediately, no debt)
-- paid_now = 0           →  full debt (nothing paid now)
-- paid_now between 0 and total  →  split: pays part now, rest becomes debt
-
-Workflow:
-1. Call get_cart to know the total if you don't already.
-2. Infer paid_now from what the user said:
-   - "buy it" / "purchase" / "pay in full" → paid_now = cart total
-   - "put on debt" / "debt" / "I'll pay later" → paid_now = 0
-   - "pay X now" / "X as debt" / "half now" → compute paid_now accordingly
-3. Only ask the user for clarification if their intent is genuinely ambiguous.
-4. Show a one-line summary ("Paying Xk now, Yk as debt") and ask for confirmation before calling.`,
+      description: `Place an order for all cart items. Call this immediately — do NOT ask for confirmation first.
+- "pay now" / "buy" / "purchase" / "pay in full" → payment_type = "pay_now"
+- "debt" / "pay later" / "on debt" / "I'll pay later" → payment_type = "debt"
+- "pay X now" / "half now" / "split" → payment_type = "split", paid_now = the amount paying now (number in K L.L)`,
       parameters: {
         type: "object",
         properties: {
+          payment_type: {
+            type: "string",
+            enum: ["pay_now", "debt", "split"],
+            description: "pay_now = full payment now. debt = full amount as debt. split = partial payment now, rest as debt.",
+          },
           paid_now: {
-            type: "number",
-            description: "K L.L the user is paying right now. Must be between 0 and the cart total (inclusive).",
+            anyOf: [{ type: "number" }, { type: "null" }],
+            description: "Only required for payment_type=split: the amount paying now in K L.L. Omit or null for pay_now and debt.",
           },
         },
-        required: ["paid_now"],
+        required: ["payment_type"],
       },
     },
   },
@@ -145,8 +141,34 @@ Workflow:
     type: "function",
     function: {
       name: "get_my_orders",
-      description: "Get the current user's order history.",
+      description: "Get the current user's full order history.",
       parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_my_debts",
+      description: "Get the current user's outstanding (unpaid or partially paid) debt orders. Use this when the user asks about what they owe, their debt, or how much they need to pay.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "pay_debt",
+      description: "Record a payment toward one of the user's outstanding debt orders. Call get_my_debts first to get the order_id. Pass a specific amount in K L.L, or null to pay the full remaining balance.",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: { type: "string", description: "The debt order ID from get_my_debts" },
+          amount: {
+            anyOf: [{ type: "number" }, { type: "null" }],
+            description: "Amount to pay in K L.L. Pass null to pay the full remaining balance.",
+          },
+        },
+        required: ["order_id", "amount"],
+      },
     },
   },
   {
@@ -181,8 +203,8 @@ const ADMIN_EXTRA_TOOLS: Groq.Chat.ChatCompletionTool[] = [
         properties: {
           path: {
             type: "string",
-            enum: ["/admin", "/admin/products", "/admin/orders", "/admin/wallets", "/admin/debt", "/admin/users"],
-            description: "/admin=dashboard, /admin/products=products, /admin/orders=orders, /admin/wallets=wallets, /admin/debt=debts, /admin/users=users",
+            enum: ["/admin", "/admin/products", "/admin/orders", "/admin/debt", "/admin/users"],
+            description: "/admin=dashboard, /admin/products=products, /admin/orders=orders, /admin/debt=debts, /admin/users=users",
           },
         },
         required: ["path"],
@@ -566,10 +588,15 @@ async function executeTool(
 
         const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-        const rawPaidNow = parseFloat(String((args as { paid_now?: number }).paid_now));
-        const paidNow = isNaN(rawPaidNow)
-          ? total  // default to full payment if not specified
-          : Math.max(0, Math.min(rawPaidNow, total));
+        const { payment_type: paymentType, paid_now: paidNowArg } = args as { payment_type?: string; paid_now?: number };
+        let paidNow: number;
+        if (paymentType === "debt") {
+          paidNow = 0;
+        } else if (paymentType === "split" && typeof paidNowArg === "number") {
+          paidNow = Math.max(0, Math.min(paidNowArg, total));
+        } else {
+          paidNow = total; // pay_now or fallback
+        }
         const debtAmount = total - paidNow;
         const isFullPayment = debtAmount === 0;
         const orderType = isFullPayment ? "purchase" : "dept";
@@ -644,13 +671,84 @@ async function executeTool(
         return JSON.stringify(data);
       }
 
+      case "get_my_debts": {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("id, total_price, paid_amount, payment_status, created_at, order_items(product_name, quantity, price)")
+          .eq("user_id", userId)
+          .eq("type", "dept")
+          .neq("payment_status", "paid")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        const debts = ((data ?? []) as Array<{
+          id: string; total_price: number; paid_amount: number;
+          payment_status: string; created_at: string;
+          order_items: Array<{ product_name: string; quantity: number; price: number }>;
+        }>).map((o) => ({
+          order_id: o.id,
+          total: fmt(o.total_price),
+          paid: fmt(o.paid_amount ?? 0),
+          remaining: fmt(o.total_price - (o.paid_amount ?? 0)),
+          status: o.payment_status,
+          date: o.created_at,
+          items: o.order_items.map((i) => `${i.product_name} x${i.quantity}`).join(", "),
+        }));
+        if (debts.length === 0) return JSON.stringify({ message: "You have no outstanding debts." });
+        return JSON.stringify({ outstanding_debts: debts, count: debts.length });
+      }
+
+      case "pay_debt": {
+        const { order_id, amount: rawAmount } = args as { order_id: string; amount: number | null };
+        if (!order_id) return JSON.stringify({ error: "Provide a valid order_id." });
+
+        const { data: order, error: fetchErr } = await supabase
+          .from("orders")
+          .select("id, total_price, paid_amount, payment_status, user_id")
+          .eq("id", order_id)
+          .eq("user_id", userId)
+          .eq("type", "dept")
+          .single();
+        if (fetchErr || !order) return JSON.stringify({ error: "Debt order not found." });
+
+        const o = order as { id: string; total_price: number; paid_amount: number; payment_status: string; user_id: string };
+        const remaining = o.total_price - (o.paid_amount ?? 0);
+        if (remaining <= 0) return JSON.stringify({ error: "This debt is already fully paid." });
+
+        // null or 0 means pay the full remaining balance
+        const paying = (rawAmount === null || rawAmount <= 0) ? remaining : Math.min(rawAmount, remaining);
+        const newPaid = (o.paid_amount ?? 0) + paying;
+        const isFullyPaid = newPaid >= o.total_price;
+        const newStatus = isFullyPaid ? "paid" : "partial";
+
+        const { error: updateErr } = await supabase
+          .from("orders")
+          .update({
+            paid_amount: newPaid,
+            payment_status: newStatus,
+            ...(isFullyPaid ? { status: "completed" } : {}),
+          })
+          .eq("id", order_id);
+        if (updateErr) throw updateErr;
+
+        return JSON.stringify({
+          success: true,
+          refresh_debt: true,
+          paid: fmt(paying),
+          total_paid: fmt(newPaid),
+          remaining: fmt(o.total_price - newPaid),
+          message: isFullyPaid
+            ? `Debt fully paid! You paid ${fmt(paying)}. This order is now settled.`
+            : `Payment of ${fmt(paying)} recorded. Remaining balance: ${fmt(o.total_price - newPaid)}.`,
+        });
+      }
+
       // ── Admin tools ──────────────────────────────────────────────────────
 
       case "admin_get_all_orders": {
         const { data: orders, error } = await supabase
           .from("orders")
           .select("id, user_id, total_price, type, status, payment_status, paid_amount, created_at, order_items(product_name, quantity, price)")
-          .order("created_at", { ascending: false }).limit(5);
+          .order("created_at", { ascending: false }).limit(50);
         if (error) throw error;
 
         const userIds = [...new Set((orders ?? []).map((o: Record<string, unknown>) => o.user_id as string))];
@@ -880,52 +978,102 @@ export async function POST(req: NextRequest) {
     const systemPrompt = isAdmin
       ? `You are a smart AI assistant for NavyBits Market, a mini-market management system.
 You are talking to ${userName}, who is an ADMIN.
-CURRENCY: All prices and amounts are in K L.L (Lebanese Pounds ÷ 1000). Always show as "X K L.L".
+CURRENCY: All prices and amounts are in K L.L (Lebanese Pounds ÷ 1000). Always display as "X K L.L".
+IMPORTANT: No wallet feature exists on this site. Never mention wallets or balances.
 
-IMPORTANT: This website has NO wallet feature. There is no wallet, no balance, no top-up. Never mention or suggest anything wallet-related. If asked about wallets, say the feature does not exist.
+━━ NAVIGATION RULES ━━
+ALWAYS call admin_navigate_to the moment the admin mentions any page — even while fetching data.
+- "dashboard" / "home" / "overview" → /admin
+- "products" / "catalog" / "inventory" → /admin/products
+- "orders" / "purchases" → /admin/orders
+- "debts" / "debt management" / "owed" → /admin/debt
+- "users" / "customers" / "members" → /admin/users
+For the admin's own personal pages use navigate_to: / (products), /cart, /profile, /debt.
 
-NAVIGATION RULE: Whenever the admin mentions or asks about a page (dashboard, products, orders, debts, users), ALWAYS call admin_navigate_to immediately, even while also fetching data.
+━━ ADMIN CAPABILITIES ━━
+DASHBOARD
+- Stats (revenue, debt, orders, users): admin_get_dashboard_stats
 
-ADMIN CAPABILITIES:
-- Dashboard stats: admin_get_dashboard_stats
-- Products: get_products, admin_add_product, admin_edit_product, admin_delete_product
-- All orders: admin_get_all_orders
-- Debts: admin_get_debts, admin_update_debt
-- Users: admin_get_all_users, admin_toggle_user_role
+PRODUCTS
+- List all: get_products
+- Add new: admin_add_product (name, price, quantity required; image_url optional)
+- Edit existing: admin_edit_product — call get_products first for product_id, then pass only the fields to change
+- Delete: admin_delete_product — call get_products first for product_id. Always confirm before deleting.
 
-PERSONAL (your own account, same as any user):
-- Browse products: get_products
-- Your cart: get_cart, get_products then add_to_cart (use product_id or product_name from the list), empty_cart (clear all), update_cart_quantity, decrease_cart_quantity, remove_from_cart
-- Place order: confirm_purchase — infer payment intent from context, only ask when ambiguous. "buy"/"purchase" → full payment, "debt"/"later" → full debt, "pay X now" → split. Show summary and confirm before calling.
-- Your orders: get_my_orders
-- Your debts: navigate_to /debt
+ORDERS
+- View all orders: admin_get_all_orders (returns last 50 orders with customer info and items)
+- Filter intent: when admin asks for "debt orders" → admin_get_debts; otherwise use admin_get_all_orders
 
-NAVIGATION: Use admin_navigate_to for admin pages (/admin, /admin/products, /admin/orders, /admin/debt, /admin/users) and navigate_to for user pages (/, /cart, /profile, /debt). ALWAYS navigate when a page is mentioned.
+DEBTS
+- View all outstanding debts: admin_get_debts
+- Record payment on a debt: admin_update_debt (needs order_id from admin_get_debts, paid_amount = NEW TOTAL paid, payment_status = "partial" or "paid")
 
-When listing orders/users, return a clean readable response with short bullet lines (avoid dumping raw JSON).
-Always confirm before deleting products or changing user roles. Be concise and professional.
-NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Use names, emails, dates, and amounts only.`
+USERS
+- List all users: admin_get_all_users
+- Change role to admin or user: admin_toggle_user_role (needs email + role). Always confirm before changing.
+
+━━ ADMIN'S OWN SHOPPING (personal account) ━━
+- Browse: get_products
+- Cart: get_cart, add_to_cart (call get_products first to get product_id or use product_name), update_cart_quantity, decrease_cart_quantity, remove_from_cart, empty_cart
+- Order: When placing an order, call get_cart then ask "Pay now or put on debt?" then call confirm_purchase:
+  · "pay now"/"purchase" → payment_type="pay_now"
+  · "debt"/"later" → payment_type="debt"
+  · "pay X now"/"split" → payment_type="split", paid_now=X
+- Order history: get_my_orders
+- My debts: get_my_debts → pay_debt (amount=null to pay full balance, amount=X for specific amount)
+
+━━ RESPONSE RULES ━━
+- Present data as clean bullet lists — never dump raw JSON or UUIDs
+- Use names, emails, dates, and K L.L amounts only
+- Be concise and professional`
       : `You are a friendly shopping assistant for NavyBits Market.
-You are helping ${userName}, a regular customer.
-CURRENCY: All prices are in K L.L (Lebanese Pounds ÷ 1000). Always show as "X K L.L".
+You are helping ${userName}.
+CURRENCY: All prices are in K L.L (Lebanese Pounds ÷ 1000). Always display as "X K L.L".
+IMPORTANT: No wallet feature exists on this site. Never mention wallets or balances.
 
-IMPORTANT: This website has NO wallet feature. There is no wallet, no balance, no top-up. Never mention or suggest anything wallet-related. If asked about wallets, clearly say the feature does not exist on this website.
+━━ NAVIGATION RULES ━━
+ALWAYS call navigate_to the moment the user mentions any page — even while fetching data.
+- "cart" / "view cart" / "show cart" / "open cart" / "my cart" → /cart
+- "orders" / "my orders" / "history" / "profile" / "account" → /profile
+- "products" / "shop" / "home" / "browse" / "catalog" → /
+- "debt" / "my debt" / "what I owe" / "pay debt" / "outstanding" → /debt
 
-NAVIGATION RULE: Whenever the user mentions or asks about any page (cart, products, orders, profile, debts), ALWAYS call navigate_to immediately to take them there, even while also fetching data.
-- "show my cart" or "cart" → navigate_to /cart
-- "my orders" or "profile" → navigate_to /profile
-- "products" or "shop" or "home" → navigate_to /
-- "my debts" or "debt" or "what do I owe" → navigate_to /debt
+━━ YOUR CAPABILITIES ━━
+PRODUCTS
+- List products + stock + prices: get_products
 
-YOUR FULL CAPABILITIES:
-- Products: get_products
-- Cart: get_products (always call first before add_to_cart), add_to_cart with product_id OR product_name, empty_cart, get_cart, update_cart_quantity, decrease_cart_quantity, remove_from_cart
-- Orders: confirm_purchase — infer from what the user says. "buy" / "purchase" / "pay now" → paid_now = total. "debt" / "later" / "I'll pay later" → paid_now = 0. "pay X now" or "X as debt" → compute split. Only ask for clarification if truly ambiguous. Always show a short confirmation ("Paying 80K now, 40K as debt — confirm?") before calling.
-- Debts: navigate_to /debt — users can view and pay their outstanding debts there
+CART
+- View cart: get_cart
+- Add item: call get_products FIRST to get product_id or use exact product_name, then add_to_cart
+- Increase quantity: update_cart_quantity (set exact new quantity)
+- Decrease quantity: decrease_cart_quantity (removes X units; removes item if result ≤ 0)
+- Remove item entirely: remove_from_cart
+- Clear everything: empty_cart
 
-When asked about debt or how much they owe, use get_my_orders and filter for type "dept" with payment_status not "paid", then offer to navigate to /debt.
-Be friendly and proactive. Warn if stock is low. Always confirm before placing orders.
-NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Use names, prices, dates, and quantities only.`;
+ORDERING
+When the user wants to place an order (says "buy", "purchase", "confirm order", "checkout", etc.):
+1. Call get_cart to get the total (if you don't already have it)
+2. Ask: "Would you like to pay now (X K L.L) or put it on debt?"
+3. Wait for their answer, then call confirm_purchase:
+   - "pay now" / "pay in full" / "yes pay" → payment_type="pay_now"
+   - "debt" / "pay later" / "on debt" / "later" → payment_type="debt"
+   - "pay X now" / "half now" / "split" → payment_type="split", paid_now=X
+
+DEBTS
+- Check outstanding debts: get_my_debts (shows each debt with remaining balance)
+- Pay debt: call get_my_debts first, then pay_debt with the order_id
+  · "pay 50 K L.L on my debt" / "pay 200 toward my order" → amount=50 / amount=200
+  · "pay all my debt" / "settle my debt" / "pay everything" → amount=null (pays full remaining balance)
+- View debt page: navigate_to /debt
+
+ORDER HISTORY
+- get_my_orders (full history of all orders)
+
+━━ RESPONSE RULES ━━
+- Be warm and concise
+- Warn when stock is low (≤ 5 units)
+- Never show UUIDs or raw IDs — use names, prices, dates, quantities only
+- If a product isn't found, suggest calling get_products to browse`;
 
     const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
@@ -944,11 +1092,22 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
       "confirm_purchase",
     ]);
     let refreshCart = false;
+    let refreshDebt = false;
+
+    async function groqCreate(
+      params: Omit<Parameters<typeof groq.chat.completions.create>[0], "model">,
+    ): Promise<Groq.Chat.ChatCompletion> {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await (groq.chat.completions.create as any)({
+        ...params,
+        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        stream: false,
+      })) as Groq.Chat.ChatCompletion;
+    }
 
     // Agentic loop — max 8 iterations to prevent runaway chains
     for (let i = 0; i < 8; i++) {
-      const response = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      const response = await groqCreate({
         messages: groqMessages,
         tools,
         tool_choice: "auto",
@@ -961,7 +1120,7 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
 
       if (choice.finish_reason === "tool_calls" && msg.tool_calls) {
         const toolResults = await Promise.all(
-          msg.tool_calls.map(async (tc) => {
+          msg.tool_calls.map(async (tc: Groq.Chat.ChatCompletionMessageToolCall) => {
             let args: Record<string, unknown>;
             let parseFailed = false;
             try {
@@ -978,6 +1137,9 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
               }
               if (CART_MUTATING_TOOLS.has(tc.function.name)) {
                 refreshCart = true;
+              }
+              if (tc.function.name === "pay_debt") {
+                refreshDebt = true;
               }
             }
 
@@ -1001,8 +1163,7 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
     }
 
     if (!finalText.trim()) {
-      const wrapUp = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      const wrapUp = await groqCreate({
         messages: groqMessages,
         tool_choice: "none",
         max_tokens: 512,
@@ -1012,13 +1173,18 @@ NEVER display UUIDs, raw IDs, or any technical identifiers in your responses. Us
         "Done — check your cart or the page I opened for you.";
     }
 
-    return NextResponse.json({ message: finalText, navigate_to: navigateTo, refresh_cart: refreshCart });
+    return NextResponse.json({ message: finalText, navigate_to: navigateTo, refresh_cart: refreshCart, refresh_debt: refreshDebt });
   } catch (err: unknown) {
     console.error("[/api/chat] Error:", err);
+    const status = (err as { status?: number }).status;
+    if (status === 429) {
+      return NextResponse.json(
+        { error: "The assistant is currently busy — please wait a moment and try again." },
+        { status: 429 },
+      );
+    }
     return NextResponse.json(
-      {
-        error: "Sorry — I couldn't complete that request. Please try again.",
-      },
+      { error: "Sorry — I couldn't complete that request. Please try again." },
       { status: 500 },
     );
   }

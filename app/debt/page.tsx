@@ -58,6 +58,13 @@ export default function DebtPage() {
     fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-fetch when the chatbot pays a debt
+  useEffect(() => {
+    const handler = () => fetchData();
+    window.addEventListener("debt-updated", handler);
+    return () => window.removeEventListener("debt-updated", handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const totalRemaining = debts.reduce(
     (sum, d) => sum + (d.total_price - (d.paid_amount ?? 0)),
     0,

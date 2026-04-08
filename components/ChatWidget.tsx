@@ -156,11 +156,14 @@ export default function ChatWidget() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: updatedMessages, userId }),
         });
-        const data = await res.json() as { message?: string; error?: string; navigate_to?: string; refresh_cart?: boolean };
+        const data = await res.json() as { message?: string; error?: string; navigate_to?: string; refresh_cart?: boolean; refresh_debt?: boolean };
         setMessages((m) => [...m, { role: "assistant", content: data.message ?? data.error ?? "No response." }]);
 
         // Refresh cart badge if the bot mutated cart or confirmed an order
         if (data.refresh_cart) await refreshCart();
+
+        // Tell the debt page to re-fetch if the bot paid a debt
+        if (data.refresh_debt) window.dispatchEvent(new CustomEvent("debt-updated"));
 
         // Navigate the browser to the requested page
         if (data.navigate_to) router.push(data.navigate_to);
