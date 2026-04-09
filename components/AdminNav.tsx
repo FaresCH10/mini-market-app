@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AuthButton from "@/components/auth-button";
-import { FaShoppingBag, FaTimes } from "react-icons/fa";
+import { FaTimes } from "react-icons/fa";
+import Image from "next/image";
 import { AiOutlineShoppingCart } from "react-icons/ai";
 // import { IoWalletOutline } from "react-icons/io5";
 // import WalletModal from "@/components/WalletModal";
@@ -80,9 +81,7 @@ export default function Navbar() {
       <nav className="bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[#1B2D72] font-bold text-xl">
-            <div className="bg-[#1B2D72] text-white p-1.5 rounded-lg">
-              <FaShoppingBag size={16} />
-            </div>
+            <Image src="/store.png" alt="NavyBits" width={36} height={36} className="rounded-lg object-cover" />
             <span className="hidden sm:inline">NavyBits Market</span>
           </div>
           <div className="w-24 h-8 bg-gray-100 animate-pulse rounded-full" />
@@ -102,9 +101,7 @@ export default function Navbar() {
               href="/"
               className="flex items-center gap-2 text-[#1B2D72] font-bold text-xl tracking-tight hover:opacity-80 transition-opacity"
             >
-              <div className="bg-[#1B2D72] text-white p-1.5 rounded-lg">
-                <FaShoppingBag size={16} />
-              </div>
+              <Image src="/store.png" alt="NavyBits" width={36} height={36} className="rounded-lg object-cover" />
               <span className="hidden sm:inline">NavyBits Market</span>
               <span className="sm:hidden">NavyBits</span>
             </Link>
@@ -201,9 +198,7 @@ export default function Navbar() {
         {/* Drawer Header */}
         <div className="flex items-center justify-between px-5 h-16 border-b border-gray-100">
           <div className="flex items-center gap-2 text-[#1B2D72] font-bold">
-            <div className="bg-[#1B2D72] text-white p-1.5 rounded-lg">
-              <FaShoppingBag size={13} />
-            </div>
+            <Image src="/store.png" alt="NavyBits" width={30} height={30} className="rounded-lg object-cover" />
             NavyBits
           </div>
           <button
