@@ -12,7 +12,7 @@ type Product = {
 }
 
 export default function AddToCartButton({ product }: { product: Product }) {
-  const { addItem } = useCart()
+  const { addItem, userId } = useCart()
   const [isLoading, setIsLoading] = useState(false)
 
   const handleAddToCart = async () => {
@@ -23,7 +23,7 @@ export default function AddToCartButton({ product }: { product: Product }) {
     setIsLoading(true)
     try {
       await addItem(product)
-      toast.success(`${product.name} added to cart!`)
+      if (userId) toast.success(`${product.name} added to cart!`)
     } catch (error) {
       toast.error('Failed to add to cart')
       console.error(error)

@@ -33,7 +33,7 @@ export default function OrdersPage() {
   const checkAuthAndFetch = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
+      if (!user) { router.push('/auth/login'); return; }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (profile?.role !== "admin") { toast.error("Admin access only"); router.push("/"); return; }
       await fetchOrders();

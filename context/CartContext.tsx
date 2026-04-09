@@ -25,6 +25,7 @@ type CartContextType = {
   itemCount: number;
   loading: boolean;
   refreshCart: () => Promise<void>;
+  userId: string | null;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -125,7 +126,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = async (product: any) => {
     if (!userId) {
       toast.error("Please login first");
-      router.push("/login");
+      router.push('/auth/login');
       return;
     }
 
@@ -244,6 +245,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         itemCount,
         loading,
         refreshCart,
+        userId,
       }}
     >
       {children}

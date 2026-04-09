@@ -79,7 +79,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const supabase = createClient()
     const checkAdmin = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { router.push('/auth/login'); return }
       const { data: profile } = await supabase
         .from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.push('/'); return }

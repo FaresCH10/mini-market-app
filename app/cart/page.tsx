@@ -57,7 +57,7 @@ export default function CartPage() {
     setCheckoutLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { toast.error("Please login to checkout"); router.push("/login"); return; }
+      if (!user) { toast.error("Please login to checkout"); router.push('/auth/login'); return; }
       if (items.length === 0) { toast.error("Your cart is empty"); return; }
 
       // Validate pay now amount
