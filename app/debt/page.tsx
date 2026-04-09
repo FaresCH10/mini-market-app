@@ -117,7 +117,7 @@ export default function DebtPage() {
           <h1 className="text-2xl font-bold text-gray-900">My Debts</h1>
           <p className="text-sm text-gray-400 mt-0.5">Pay off your outstanding orders</p>
         </div>
-        <Link href="/profile" className="text-sm text-[#000080] hover:underline">
+        <Link href="/profile" className="text-sm text-[#1B2D72] hover:underline">
           ← Back to Profile
         </Link>
       </div>
@@ -137,7 +137,7 @@ export default function DebtPage() {
           </div>
           <h2 className="text-lg font-bold text-gray-800 mb-1">All clear!</h2>
           <p className="text-sm text-gray-400">You have no outstanding debts.</p>
-          <Link href="/" className="inline-flex items-center gap-2 mt-5 bg-[#000080] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#1F51FF] transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 mt-5 bg-[#1B2D72] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#00AECC] transition-colors">
             Browse Products
           </Link>
         </div>

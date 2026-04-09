@@ -162,7 +162,7 @@ export default function CartPage() {
         </div>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Your cart is empty</h2>
         <p className="text-gray-400 text-sm mb-6">Add some products to get started</p>
-        <Link href="/" className="inline-flex items-center gap-2 bg-[#000080] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1F51FF] transition-colors">
+        <Link href="/" className="inline-flex items-center gap-2 bg-[#1B2D72] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#00AECC] transition-colors">
           Browse Products
         </Link>
       </div>
@@ -176,7 +176,7 @@ export default function CartPage() {
           Shopping Cart
           <span className="ml-2 text-base font-medium text-gray-400">({items.length} items)</span>
         </h1>
-        <Link href="/" className="text-sm text-[#000080] hover:underline flex items-center gap-1">
+        <Link href="/" className="text-sm text-[#1B2D72] hover:underline flex items-center gap-1">
           ← Continue Shopping
         </Link>
       </div>
@@ -198,7 +198,7 @@ export default function CartPage() {
 
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
-                <p className="text-sm font-bold text-[#000080]">{item.price}K L.L</p>
+                <p className="text-sm font-bold text-[#1B2D72]">{item.price}K L.L</p>
               </div>
 
               <div className="flex flex-col items-center gap-1">
@@ -266,7 +266,7 @@ export default function CartPage() {
                       const v = parseFloat(payNow) || 0;
                       setPayNow(String(Math.max(0, Math.min(v, total))));
                     }}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#000080]/30 focus:border-[#000080] pr-14"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/30 focus:border-[#1B2D72] pr-14"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">K L.L</span>
                 </div>
@@ -278,7 +278,7 @@ export default function CartPage() {
                   >All debt</button>
                   <button
                     onClick={() => setPayNow(String(Math.round(total / 2)))}
-                    className="flex-1 text-xs py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-[#000080] transition-colors font-medium"
+                    className="flex-1 text-xs py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-[#1B2D72] transition-colors font-medium"
                   >Half</button>
                   <button
                     onClick={() => setPayNow(String(total))}
@@ -309,7 +309,7 @@ export default function CartPage() {
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                   : debtAmount > 0
                     ? "bg-orange-500 hover:bg-orange-600 text-white active:scale-95"
-                    : "bg-[#000080] hover:bg-[#1F51FF] text-white active:scale-95"
+                    : "bg-[#1B2D72] hover:bg-[#00AECC] text-white active:scale-95"
               }`}
             >
               {checkoutLoading

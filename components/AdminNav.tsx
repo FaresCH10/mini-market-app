@@ -79,8 +79,8 @@ export default function Navbar() {
     return (
       <nav className="bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#000080] font-bold text-xl">
-            <div className="bg-[#000080] text-white p-1.5 rounded-lg">
+          <div className="flex items-center gap-2 text-[#1B2D72] font-bold text-xl">
+            <div className="bg-[#1B2D72] text-white p-1.5 rounded-lg">
               <FaShoppingBag size={16} />
             </div>
             <span className="hidden sm:inline">NavyBits Market</span>
@@ -100,9 +100,9 @@ export default function Navbar() {
             {/* Logo */}
             <Link
               href="/"
-              className="flex items-center gap-2 text-[#000080] font-bold text-xl tracking-tight hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 text-[#1B2D72] font-bold text-xl tracking-tight hover:opacity-80 transition-opacity"
             >
-              <div className="bg-[#000080] text-white p-1.5 rounded-lg">
+              <div className="bg-[#1B2D72] text-white p-1.5 rounded-lg">
                 <FaShoppingBag size={16} />
               </div>
               <span className="hidden sm:inline">NavyBits Market</span>
@@ -113,13 +113,13 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1">
               <Link
                 href="/"
-                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#000080] hover:bg-blue-50 transition-all"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#1B2D72] hover:bg-blue-50 transition-all"
               >
                 Products
               </Link>
               <Link
                 href="/cart"
-                className="relative px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#000080] hover:bg-blue-50 transition-all flex items-center gap-1.5"
+                className="relative px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#1B2D72] hover:bg-blue-50 transition-all flex items-center gap-1.5"
               >
                 <AiOutlineShoppingCart size={18} />
                 Cart
@@ -145,7 +145,7 @@ export default function Navbar() {
               {isAdmin && (
                 <Link
                   href="/admin"
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#000080] hover:bg-blue-50 transition-all"
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#1B2D72] hover:bg-blue-50 transition-all"
                 >
                   Dashboard
                 </Link>
@@ -200,8 +200,8 @@ export default function Navbar() {
       >
         {/* Drawer Header */}
         <div className="flex items-center justify-between px-5 h-16 border-b border-gray-100">
-          <div className="flex items-center gap-2 text-[#000080] font-bold">
-            <div className="bg-[#000080] text-white p-1.5 rounded-lg">
+          <div className="flex items-center gap-2 text-[#1B2D72] font-bold">
+            <div className="bg-[#1B2D72] text-white p-1.5 rounded-lg">
               <FaShoppingBag size={13} />
             </div>
             NavyBits
@@ -219,7 +219,7 @@ export default function Navbar() {
           <Link
             href="/"
             onClick={() => setIsMenuOpen(false)}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#000080] transition-colors"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#1B2D72] transition-colors"
           >
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -230,7 +230,7 @@ export default function Navbar() {
           <Link
             href="/cart"
             onClick={() => setIsMenuOpen(false)}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#000080] transition-colors"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#1B2D72] transition-colors"
           >
             <AiOutlineShoppingCart size={17} className="text-gray-400" />
             Cart
@@ -263,7 +263,7 @@ export default function Navbar() {
             <Link
               href="/admin"
               onClick={() => setIsMenuOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#000080] transition-colors"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#1B2D72] transition-colors"
             >
               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -279,7 +279,7 @@ export default function Navbar() {
             <>
               {/* User info */}
               <div className="flex items-center gap-3 px-4 py-2 mb-1">
-                <div className="w-8 h-8 rounded-full bg-[#000080] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-[#1B2D72] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
                   {userEmail ? userEmail[0].toUpperCase() : "?"}
                 </div>
                 <span className="text-sm text-gray-600 truncate">{userEmail}</span>
@@ -303,7 +303,7 @@ export default function Navbar() {
               <Link
                 href="/profile"
                 onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#000080] transition-colors"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#1B2D72] transition-colors"
               >
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -329,7 +329,7 @@ export default function Navbar() {
             <Link
               href="/auth/login"
               onClick={() => setIsMenuOpen(false)}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-[#000080] hover:bg-[#1F51FF] transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-[#1B2D72] hover:bg-[#00AECC] transition-colors"
             >
               Sign In
             </Link>

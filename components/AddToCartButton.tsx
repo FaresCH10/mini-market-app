@@ -47,7 +47,7 @@ export default function AddToCartButton({ product }: { product: Product }) {
     <button
       onClick={handleAddToCart}
       disabled={isLoading}
-      className="w-full py-2.5 rounded-xl text-sm font-semibold bg-[#000080] text-white hover:bg-[#1F51FF] active:scale-95 disabled:opacity-60 transition-all duration-150 flex items-center justify-center gap-2"
+      className="w-full py-2.5 rounded-xl text-sm font-semibold bg-[#1B2D72] text-white hover:bg-[#00AECC] active:scale-95 disabled:opacity-60 transition-all duration-150 flex items-center justify-center gap-2"
     >
       {isLoading ? (
         <>

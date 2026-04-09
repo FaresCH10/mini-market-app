@@ -107,7 +107,7 @@ export default function OrdersPage() {
           { label: 'Total Orders', value: orders.length, color: 'text-gray-900' },
           { label: 'Paid', value: orders.filter(o => o.payment_status === 'paid').length, color: 'text-emerald-600' },
           { label: 'Pending / Partial', value: pendingCount, color: 'text-amber-600' },
-          { label: 'Revenue', value: `${totalRevenue}K L.L`, color: 'text-[#000080]' },
+          { label: 'Revenue', value: `${totalRevenue}K L.L`, color: 'text-[#1B2D72]' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">{s.label}</p>
@@ -121,14 +121,14 @@ export default function OrdersPage() {
         <div className="relative flex-1 min-w-[200px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input type="text" placeholder="Search by name, email, or order ID..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all" />
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all" />
         </div>
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 bg-white">
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white">
           <option value="all">All Types</option>
           <option value="purchase">Purchase</option>
           <option value="dept">Debt</option>
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 bg-white">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white">
           <option value="all">All Statuses</option>
           <option value="paid">Paid</option>
           <option value="partial">Partial</option>

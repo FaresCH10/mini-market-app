@@ -89,7 +89,7 @@ export default function Home() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-1">
-          Welcome to <span className="text-[#000080]">NavyBits Market</span>
+          Welcome to <span className="text-[#1B2D72]">NavyBits Market</span>
         </h1>
         <p className="text-gray-500 text-sm">
           Browse and add products to your cart
@@ -116,7 +116,7 @@ export default function Home() {
           placeholder="Search products..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
         />
       </div>
 
@@ -163,7 +163,7 @@ export default function Home() {
               {search && (
                 <button
                   onClick={() => setSearch("")}
-                  className="mt-2 text-sm text-[#000080] hover:underline"
+                  className="mt-2 text-sm text-[#1B2D72] hover:underline"
                 >
                   Clear search
                 </button>
@@ -218,7 +218,7 @@ export default function Home() {
                       <h2 className="font-semibold text-gray-900 mb-1 leading-tight">
                         {product.name}
                       </h2>
-                      <p className="text-xl font-bold text-[#000080] mb-1">
+                      <p className="text-xl font-bold text-[#1B2D72] mb-1">
                         {product.price}K L.L
                       </p>
                       {!isOutOfStock && (

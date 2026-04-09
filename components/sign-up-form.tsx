@@ -66,7 +66,7 @@ export function SignUpForm({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-xl border-gray-200 focus:border-[#000080] focus:ring-[#000080]/20"
+              className="rounded-xl border-gray-200 focus:border-[#1B2D72] focus:ring-[#1B2D72]/20"
             />
           </div>
 
@@ -80,7 +80,7 @@ export function SignUpForm({
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl border-gray-200 focus:border-[#000080] focus:ring-[#000080]/20"
+              className="rounded-xl border-gray-200 focus:border-[#1B2D72] focus:ring-[#1B2D72]/20"
             />
           </div>
 
@@ -94,7 +94,7 @@ export function SignUpForm({
               required
               value={repeatPassword}
               onChange={(e) => setRepeatPassword(e.target.value)}
-              className={`rounded-xl border-gray-200 focus:border-[#000080] focus:ring-[#000080]/20 ${
+              className={`rounded-xl border-gray-200 focus:border-[#1B2D72] focus:ring-[#1B2D72]/20 ${
                 repeatPassword && password !== repeatPassword ? "border-red-300 focus:border-red-400" : ""
               }`}
             />
@@ -112,7 +112,7 @@ export function SignUpForm({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 rounded-xl bg-[#000080] text-white font-semibold text-sm hover:bg-[#1F51FF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2"
+            className="w-full py-2.5 rounded-xl bg-[#1B2D72] text-white font-semibold text-sm hover:bg-[#00AECC] disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2"
           >
             {isLoading ? "Creating account..." : "Create Account"}
           </button>
@@ -120,7 +120,7 @@ export function SignUpForm({
 
         <p className="text-center text-sm text-gray-400 mt-5">
           Already have an account?{" "}
-          <Link href="/auth/login" className="text-[#000080] font-semibold hover:underline">
+          <Link href="/auth/login" className="text-[#1B2D72] font-semibold hover:underline">
             Sign in
           </Link>
         </p>

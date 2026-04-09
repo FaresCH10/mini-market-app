@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function Page() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#000080] via-[#0a0a6e] to-[#1F51FF] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#1B2D72] via-[#1B2D72] to-[#00AECC] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">

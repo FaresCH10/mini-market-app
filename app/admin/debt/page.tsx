@@ -262,14 +262,14 @@ export default function DebtPage() {
                               onChange={e => setPaymentAmount({ ...paymentAmount, [order.id]: parseFloat(e.target.value) || 0 })}
                               placeholder="Partial amount"
                               disabled={isProcessing}
-                              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all pr-14"
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all pr-14"
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">K L.L</span>
                           </div>
                           <button
                             onClick={() => handlePartialPayment(order.id, order.total_price)}
                             disabled={isProcessing || !paymentAmount[order.id] || paymentAmount[order.id] <= 0}
-                            className="px-4 py-2.5 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="px-4 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                           >
                             {isProcessing ? "…" : "Pay"}
                           </button>

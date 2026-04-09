@@ -49,7 +49,7 @@ export default function AuthButton() {
     return (
       <Link
         href="/auth/login"
-        className="bg-[#000080] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1F51FF] transition-colors"
+        className="bg-[#1B2D72] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#00AECC] transition-colors"
       >
         Sign In
       </Link>
@@ -62,7 +62,7 @@ export default function AuthButton() {
         onClick={() => setShowMenu(!showMenu)}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
-        <div className="w-8 h-8 rounded-full bg-[#000080] text-white flex items-center justify-center text-xs font-bold">
+        <div className="w-8 h-8 rounded-full bg-[#1B2D72] text-white flex items-center justify-center text-xs font-bold">
           {initials}
         </div>
         <span className="hidden lg:inline text-sm font-medium text-gray-700 max-w-[120px] truncate">

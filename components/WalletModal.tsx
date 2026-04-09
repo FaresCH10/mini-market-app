@@ -128,7 +128,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
 
         {/* Header */}
-        <div className={`px-6 pt-6 pb-8 text-white ${isInDebt ? "bg-gradient-to-br from-red-700 to-red-500" : "bg-gradient-to-br from-[#000080] to-[#1F51FF]"}`}>
+        <div className={`px-6 pt-6 pb-8 text-white ${isInDebt ? "bg-gradient-to-br from-red-700 to-red-500" : "bg-gradient-to-br from-[#1B2D72] to-[#00AECC]"}`}>
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-xs font-medium text-blue-200 uppercase tracking-wider mb-1">My Wallet</p>
@@ -159,8 +159,8 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
                   onClick={() => setAmount(String(q))}
                   className={`py-1.5 rounded-lg text-sm font-semibold border transition-all ${
                     amount === String(q)
-                      ? "bg-[#000080] text-white border-[#000080]"
-                      : "bg-gray-50 text-gray-600 border-gray-100 hover:border-[#000080] hover:text-[#000080]"
+                      ? "bg-[#1B2D72] text-white border-[#1B2D72]"
+                      : "bg-gray-50 text-gray-600 border-gray-100 hover:border-[#1B2D72] hover:text-[#1B2D72]"
                   }`}
                 >
                   {q}K
@@ -178,7 +178,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") addMoney(); }}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all pr-16"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all pr-16"
                 autoFocus
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
@@ -197,7 +197,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
             <button
               onClick={addMoney}
               disabled={loading || !amount || parseFloat(amount) <= 0}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-[#000080] text-white hover:bg-[#1F51FF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-[#1B2D72] text-white hover:bg-[#00AECC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Adding..." : `Add ${amount ? `${amount}K` : ""} L.L`}
             </button>

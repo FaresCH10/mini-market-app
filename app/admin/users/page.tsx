@@ -81,7 +81,7 @@ export default function ManageUsers() {
         <input
           type="text" placeholder="Search by name or email..."
           value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
         />
       </div>
 
@@ -110,7 +110,7 @@ export default function ManageUsers() {
                   <div key={user.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
                     {/* Avatar */}
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                      user.role === 'admin' ? 'bg-[#000080] text-white' : 'bg-gray-100 text-gray-600'
+                      user.role === 'admin' ? 'bg-[#1B2D72] text-white' : 'bg-gray-100 text-gray-600'
                     }`}>
                       {initials}
                     </div>
@@ -123,7 +123,7 @@ export default function ManageUsers() {
 
                     {/* Role badge */}
                     <span className={`hidden sm:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      user.role === 'admin' ? 'bg-[#000080]/10 text-[#000080]' : 'bg-gray-100 text-gray-500'
+                      user.role === 'admin' ? 'bg-[#1B2D72]/10 text-[#1B2D72]' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {user.role || 'user'}
                     </span>
@@ -140,7 +140,7 @@ export default function ManageUsers() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors disabled:opacity-50 ${
                         user.role === 'admin'
                           ? 'bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100'
-                          : 'bg-[#000080]/5 text-[#000080] border border-[#000080]/10 hover:bg-[#000080]/10'
+                          : 'bg-[#1B2D72]/5 text-[#1B2D72] border border-[#1B2D72]/10 hover:bg-[#1B2D72]/10'
                       }`}
                     >
                       {isUpdating ? '…' : user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}

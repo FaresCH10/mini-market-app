@@ -10,7 +10,7 @@ type ImportedRow = { name: string; price: number; quantity: number; image_url?: 
 type ImportPreview = { valid: ImportedRow[]; errors: { row: number; reason: string }[] }
 type ColumnMap = { name: string; price: string; quantity: string }
 
-const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all"
+const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
 const MARKET_LOGO_PLACEHOLDER = '/favicon.ico'
 const PRODUCT_IMAGES_BUCKET = 'product-images'
 
@@ -291,7 +291,7 @@ export default function ManageProducts() {
           </button>
           <button
             onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '' }); setShowForm(!showForm); setShowImport(false) }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -318,7 +318,7 @@ export default function ManageProducts() {
               {sheetNames.length ? 'Change File' : 'Choose File'}
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.ods" onChange={handleFileChange} className="hidden" />
             </label>
-            <button onClick={downloadTemplate} className="text-sm text-[#000080] hover:underline font-medium">
+            <button onClick={downloadTemplate} className="text-sm text-[#1B2D72] hover:underline font-medium">
               Download template →
             </button>
           </div>
@@ -334,7 +334,7 @@ export default function ManageProducts() {
                     onClick={() => handleSheetChange(s)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
                       selectedSheet === s
-                        ? 'bg-[#000080] text-white border-[#000080]'
+                        ? 'bg-[#1B2D72] text-white border-[#1B2D72]'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -358,7 +358,7 @@ export default function ManageProducts() {
                     <select
                       value={columnMap[field]}
                       onChange={e => setColumnMap(prev => ({ ...prev, [field]: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#000080]/20 focus:border-[#000080] transition-all bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all bg-white"
                     >
                       <option value="">— select column —</option>
                       {sheetColumns.map(col => (
@@ -372,7 +372,7 @@ export default function ManageProducts() {
                 <button
                   onClick={buildPreview}
                   disabled={!columnMap.name || !columnMap.price || !columnMap.quantity}
-                  className="px-4 py-2 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Preview Import
                 </button>
@@ -421,7 +421,7 @@ export default function ManageProducts() {
                     <p className="text-sm font-semibold text-emerald-700">{importPreview.valid.length} product(s) — edit any cell before importing</p>
                     <button
                       onClick={() => setImportPreview(prev => prev ? { ...prev, valid: [...prev.valid, { name: '', price: 0, quantity: 0 }] } : prev)}
-                      className="flex items-center gap-1 text-xs font-semibold text-[#000080] hover:underline"
+                      className="flex items-center gap-1 text-xs font-semibold text-[#1B2D72] hover:underline"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -452,7 +452,7 @@ export default function ManageProducts() {
                                   valid[i] = { ...valid[i], name: e.target.value }
                                   return { ...prev, valid }
                                 })}
-                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#000080] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#000080]/20 transition-all"
+                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#1B2D72] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2D72]/20 transition-all"
                               />
                             </td>
                             <td className="px-2 py-1.5">
@@ -467,7 +467,7 @@ export default function ManageProducts() {
                                   valid[i] = { ...valid[i], price: parseFloat(e.target.value) || 0 }
                                   return { ...prev, valid }
                                 })}
-                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#000080] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#000080]/20 transition-all"
+                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#1B2D72] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2D72]/20 transition-all"
                               />
                             </td>
                             <td className="px-2 py-1.5">
@@ -481,7 +481,7 @@ export default function ManageProducts() {
                                   valid[i] = { ...valid[i], quantity: parseInt(e.target.value) || 0 }
                                   return { ...prev, valid }
                                 })}
-                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#000080] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#000080]/20 transition-all"
+                                className="w-full border border-transparent hover:border-gray-200 focus:border-[#1B2D72] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1B2D72]/20 transition-all"
                               />
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -570,7 +570,7 @@ export default function ManageProducts() {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#000080] text-white text-sm font-semibold hover:bg-[#1F51FF] transition-colors">
+              <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors">
                 {editingProduct ? 'Update Product' : 'Add Product'}
               </button>
               <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '' }) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
@@ -609,7 +609,7 @@ export default function ManageProducts() {
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                 <div className="flex items-center justify-between mt-1 mb-3">
-                  <p className="text-lg font-bold text-[#000080]">{product.price}K L.L</p>
+                  <p className="text-lg font-bold text-[#1B2D72]">{product.price}K L.L</p>
                   <p className={`text-xs font-medium px-2 py-0.5 rounded-full ${product.quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                     {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
                   </p>

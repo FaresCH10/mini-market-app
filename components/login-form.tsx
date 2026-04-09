@@ -53,7 +53,7 @@ export function LoginForm({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-xl border-gray-200 focus:border-[#000080] focus:ring-[#000080]/20"
+              className="rounded-xl border-gray-200 focus:border-[#1B2D72] focus:ring-[#1B2D72]/20"
             />
           </div>
 
@@ -64,7 +64,7 @@ export function LoginForm({
               </Label>
               <Link
                 href="/auth/forgot-password"
-                className="text-xs text-[#000080] hover:underline"
+                className="text-xs text-[#1B2D72] hover:underline"
               >
                 Forgot password?
               </Link>
@@ -75,7 +75,7 @@ export function LoginForm({
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl border-gray-200 focus:border-[#000080] focus:ring-[#000080]/20"
+              className="rounded-xl border-gray-200 focus:border-[#1B2D72] focus:ring-[#1B2D72]/20"
             />
           </div>
 
@@ -88,7 +88,7 @@ export function LoginForm({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 rounded-xl bg-[#000080] text-white font-semibold text-sm hover:bg-[#1F51FF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2"
+            className="w-full py-2.5 rounded-xl bg-[#1B2D72] text-white font-semibold text-sm hover:bg-[#00AECC] disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2"
           >
             {isLoading ? "Signing in..." : "Sign In"}
           </button>
@@ -96,7 +96,7 @@ export function LoginForm({
 
         <p className="text-center text-sm text-gray-400 mt-5">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/sign-up" className="text-[#000080] font-semibold hover:underline">
+          <Link href="/auth/sign-up" className="text-[#1B2D72] font-semibold hover:underline">
             Sign up
           </Link>
         </p>

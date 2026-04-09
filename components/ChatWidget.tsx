@@ -180,10 +180,10 @@ export default function ChatWidget() {
   const chips = isAdmin ? ADMIN_CHIPS : USER_CHIPS;
 
   // Theme
-  const primary = isAdmin ? "#7c3aed" : "#000080";
-  const primaryDark = isAdmin ? "#5b21b6" : "#00006b";
-  const primaryLight = isAdmin ? "#ede9fe" : "#e8eaf6";
-  const primaryMid = isAdmin ? "#8b5cf6" : "#1a237e";
+  const primary = isAdmin ? "#00AECC" : "#1B2D72";
+  const primaryDark = isAdmin ? "#0090AC" : "#152260";
+  const primaryLight = isAdmin ? "#E6F8FB" : "#E6F4F8";
+  const primaryMid = isAdmin ? "#007A96" : "#1B2D72";
 
   return (
     <>
