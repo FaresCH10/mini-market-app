@@ -31,6 +31,10 @@ export default function ManageProducts() {
   const [sheetColumns, setSheetColumns] = useState<string[]>([])
   const [columnMap, setColumnMap] = useState<ColumnMap>({ name: '', price: '', quantity: '' })
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [searchingImage, setSearchingImage] = useState(false)
+  const [imagePickerUrls, setImagePickerUrls] = useState<string[]>([])
+  const [bulkImagesRunning, setBulkImagesRunning] = useState(false)
+  const [bulkImagesProgress, setBulkImagesProgress] = useState({ current: 0, total: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageUploadRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -80,6 +84,7 @@ export default function ManageProducts() {
       setFormData({ name: '', price: '', quantity: '', image_url: '' })
       setEditingProduct(null)
       setShowForm(false)
+      setImagePickerUrls([])
       fetchProducts()
     } catch { toast.error('Failed to save product') }
   }
@@ -256,6 +261,78 @@ export default function ManageProducts() {
     }
   }
 
+  const handleSearchImage = async () => {
+    if (!formData.name.trim()) { toast.error('Enter a product name first'); return }
+    setSearchingImage(true)
+    setImagePickerUrls([])
+    try {
+      const res = await fetch('/api/search-product-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productName: formData.name }),
+      })
+      const data = await res.json() as { imageUrls?: string[]; error?: string }
+      if (!res.ok || !data.imageUrls?.length) throw new Error(data.error ?? 'No images found')
+      setImagePickerUrls(data.imageUrls)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Image search failed')
+    } finally {
+      setSearchingImage(false)
+    }
+  }
+
+  const handleBulkFillAllImages = async () => {
+    if (!products.length) {
+      toast.error('No products to process')
+      return
+    }
+    const confirmed = confirm(
+      'This will look up images from Open Food Facts for every product in the catalogue. ' +
+        'When a match is found, the product image will be replaced. ' +
+        'Products with no match stay unchanged. ' +
+        'Continue?',
+    )
+    if (!confirmed) return
+
+    setBulkImagesRunning(true)
+    setBulkImagesProgress({ current: 0, total: products.length })
+    let updated = 0
+    let skipped = 0
+    let errors = 0
+
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i]
+      setBulkImagesProgress({ current: i + 1, total: products.length })
+      try {
+        const res = await fetch('/api/admin/fill-product-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: p.id }),
+        })
+        const data = (await res.json()) as {
+          ok?: boolean
+          status?: string
+          error?: string
+        }
+        if (!res.ok || !data.ok) {
+          errors += 1
+          continue
+        }
+        if (data.status === 'updated') updated += 1
+        else if (data.status === 'skipped') skipped += 1
+        else errors += 1
+      } catch {
+        errors += 1
+      }
+      await new Promise((r) => setTimeout(r, 150))
+    }
+
+    setBulkImagesRunning(false)
+    setBulkImagesProgress({ current: 0, total: 0 })
+    toast.success(`Images: ${updated} updated, ${skipped} no match, ${errors} failed`)
+    fetchProducts()
+  }
+
   if (!isAdmin) return null
   if (loading) return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -277,9 +354,39 @@ export default function ManageProducts() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{products.length} items in catalogue</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {products.length} items in catalogue
+            {bulkImagesRunning && bulkImagesProgress.total > 0 && (
+              <span className="ml-2 text-[#1B2D72] font-medium">
+                · Auto-fill {bulkImagesProgress.current}/{bulkImagesProgress.total}
+              </span>
+            )}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleBulkFillAllImages}
+            disabled={bulkImagesRunning || products.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-violet-200 bg-violet-50 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {bulkImagesRunning ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Filling images…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Auto-fill all images
+              </>
+            )}
+          </button>
           <button
             onClick={() => { setShowImport(!showImport); setShowForm(false); setImportPreview(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -547,7 +654,31 @@ export default function ManageProducts() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Image URL <span className="text-gray-400 font-normal">(optional)</span></label>
               <input type="url" value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} className={inputCls} placeholder="https://example.com/image.jpg" />
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleSearchImage}
+                  disabled={searchingImage || !formData.name.trim()}
+                  className="px-3 py-2 rounded-lg border border-[#1B2D72] text-xs font-semibold text-[#1B2D72] hover:bg-[#1B2D72] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                >
+                  {searchingImage ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8" strokeWidth="2" />
+                        <path strokeLinecap="round" strokeWidth="2" d="M21 21l-4.35-4.35" />
+                      </svg>
+                      Find Image Online
+                    </>
+                  )}
+                </button>
                 <button
                   type="button"
                   onClick={() => imageUploadRef.current?.click()}
@@ -563,8 +694,32 @@ export default function ManageProducts() {
                   onChange={handleImageUpload}
                   className="hidden"
                 />
-                <span className="text-xs text-gray-400">or paste URL manually</span>
               </div>
+              {/* Image picker */}
+              {imagePickerUrls.length > 0 && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-gray-600">{imagePickerUrls.length} images found — pick one</p>
+                    <button type="button" onClick={() => setImagePickerUrls([])} className="text-gray-400 hover:text-gray-600 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {imagePickerUrls.map((url, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => { setFormData(prev => ({ ...prev, image_url: url })); setImagePickerUrls([]) }}
+                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${formData.image_url === url ? 'border-[#1B2D72]' : 'border-transparent hover:border-[#00AECC]'}`}
+                      >
+                        <img src={url} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="mt-2 w-16 h-16 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
                 <img src={formData.image_url || MARKET_LOGO_PLACEHOLDER} alt="Preview" className="w-full h-full object-cover" />
               </div>
@@ -573,7 +728,7 @@ export default function ManageProducts() {
               <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors">
                 {editingProduct ? 'Update Product' : 'Add Product'}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '' }) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
