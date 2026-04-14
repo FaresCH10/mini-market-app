@@ -10,8 +10,8 @@ type Product = {
   name: string;
   quantity: number;
   price: number;
+  sell_price?: number | null;
   image_url?: string | null;
-  profit_percentage?: number | null;
 };
 const MARKET_LOGO_PLACEHOLDER = "/favicon.ico";
 
@@ -26,34 +26,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
   const { items, updateQuantity, removeItem } = useCart();
   const supabase = createClient();
 
   useEffect(() => {
     fetchProducts();
   }, []);
-
-  useEffect(() => {
-    const checkAdminRole = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setIsAdmin(false);
-          return;
-        }
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        setIsAdmin(profile?.role === "admin");
-      } catch {
-        setIsAdmin(false);
-      }
-    };
-    checkAdminRole();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProducts = async () => {
     try {
@@ -199,10 +177,6 @@ export default function Home() {
                 const cartQuantity = getCartQuantity(product.id);
                 const isInCart = cartQuantity > 0;
                 const isOutOfStock = product.quantity <= 0;
-                const profitRate = Number.isFinite(product.profit_percentage)
-                  ? Math.max(0, Math.min(100, Number(product.profit_percentage)))
-                  : 10;
-                const profitAmount = Number((product.price * (profitRate / 100)).toFixed(2));
 
                 return (
                   <div
@@ -247,13 +221,8 @@ export default function Home() {
                         {product.name}
                       </h2>
                       <p className="text-xl font-bold text-[#1B2D72] mb-1">
-                        {product.price}K L.L
+                        {product.sell_price ?? Number((product.price * 1.2).toFixed(2))}K L.L
                       </p>
-                      {isAdmin && (
-                        <p className="text-xs text-emerald-600 mb-1">
-                          Profit ({profitRate}%): {profitAmount}K L.L
-                        </p>
-                      )}
                       {!isOutOfStock && (
                         <p className="text-xs text-gray-400 mb-3">
                           {product.quantity} in stock

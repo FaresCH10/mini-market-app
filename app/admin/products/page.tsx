@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
-type Product = { id: string; name: string; price: number; quantity: number; image_url: string; profit_percentage: number | null }
+type Product = { id: string; name: string; price: number; sell_price: number | null; quantity: number; image_url: string }
 type ImportedRow = { name: string; price: number; quantity: number; image_url?: string }
 type ImportPreview = { valid: ImportedRow[]; errors: { row: number; reason: string }[] }
 type ColumnMap = { name: string; price: string; quantity: string }
@@ -19,7 +19,7 @@ export default function ManageProducts() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [formData, setFormData] = useState({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' })
+  const [formData, setFormData] = useState({ name: '', price: '', sell_price: '', quantity: '', image_url: '' })
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
@@ -70,9 +70,9 @@ export default function ManageProducts() {
     const productData = {
       name: formData.name,
       price: parseFloat(formData.price),
+      sell_price: parseFloat(formData.sell_price),
       quantity: parseInt(formData.quantity),
       image_url: formData.image_url || null,
-      profit_percentage: Math.max(0, Math.min(100, parseFloat(formData.profit_percentage) || 0)),
     }
     try {
       if (editingProduct) {
@@ -84,7 +84,7 @@ export default function ManageProducts() {
         if (error) throw error
         toast.success('Product added!')
       }
-      setFormData({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' })
+      setFormData({ name: '', price: '', sell_price: '', quantity: '', image_url: '' })
       setEditingProduct(null)
       setShowForm(false)
       setImagePickerUrls([])
@@ -107,9 +107,9 @@ export default function ManageProducts() {
     setFormData({
       name: product.name,
       price: product.price.toString(),
+      sell_price: (product.sell_price ?? Number((product.price * 1.2).toFixed(2))).toString(),
       quantity: product.quantity.toString(),
       image_url: product.image_url || '',
-      profit_percentage: String(product.profit_percentage ?? 10),
     })
     setShowForm(true)
     setShowImport(false)
@@ -262,7 +262,11 @@ export default function ManageProducts() {
     if (!importPreview?.valid.length) return
     setImporting(true)
     try {
-      const { error } = await supabase.from('products').insert(importPreview.valid.map(p => ({ ...p, image_url: p.image_url || null, profit_percentage: 10 })))
+      const { error } = await supabase.from('products').insert(importPreview.valid.map(p => ({
+        ...p,
+        image_url: p.image_url || null,
+        sell_price: Number((p.price * 1.2).toFixed(2)),
+      })))
       if (error) throw error
       toast.success(`${importPreview.valid.length} products imported!`)
       setImportPreview(null)
@@ -455,7 +459,7 @@ export default function ManageProducts() {
             Import Excel
           </button>
           <button
-            onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' }); setShowForm(!showForm); setShowImport(false) }}
+            onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', sell_price: '', quantity: '', image_url: '' }); setShowForm(!showForm); setShowImport(false) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -744,15 +748,39 @@ export default function ManageProducts() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (K L.L) *</label>
-                <input type="number" step="0.01" required value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} className={inputCls} placeholder="0" />
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formData.price}
+                  onChange={e => {
+                    const price = e.target.value
+                    const priceNum = parseFloat(price)
+                    setFormData({
+                      ...formData,
+                      price,
+                      sell_price: Number.isFinite(priceNum) ? (priceNum * 1.2).toFixed(2) : '',
+                    })
+                  }}
+                  className={inputCls}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Sell Price (K L.L) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formData.sell_price}
+                  onChange={e => setFormData({ ...formData, sell_price: e.target.value })}
+                  className={inputCls}
+                  placeholder="0"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Quantity *</label>
                 <input type="number" required value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} className={inputCls} placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Profit % *</label>
-                <input type="number" min={0} max={100} step="0.1" required value={formData.profit_percentage} onChange={e => setFormData({ ...formData, profit_percentage: e.target.value })} className={inputCls} placeholder="10" />
               </div>
             </div>
             <div>
@@ -832,7 +860,7 @@ export default function ManageProducts() {
               <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors">
                 {editingProduct ? 'Update Product' : 'Add Product'}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', sell_price: '', quantity: '', image_url: '' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
@@ -853,10 +881,7 @@ export default function ManageProducts() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product) => {
-            const profitRate = Number.isFinite(product.profit_percentage) ? Number(product.profit_percentage) : 10
-            const unitProfit = Number((product.price * (Math.max(0, Math.min(100, profitRate)) / 100)).toFixed(2))
-            return (
+          {products.map((product) => (
             <div key={product.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
               <div className="h-44 bg-gray-50 relative overflow-hidden">
                 {product.image_url ? (
@@ -871,14 +896,11 @@ export default function ManageProducts() {
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                 <div className="flex items-center justify-between mt-1 mb-3">
-                  <p className="text-lg font-bold text-[#1B2D72]">{product.price}K L.L</p>
+                  <p className="text-lg font-bold text-[#1B2D72]">{product.sell_price ?? Number((product.price * 1.2).toFixed(2))}K L.L</p>
                   <p className={`text-xs font-medium px-2 py-0.5 rounded-full ${product.quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                     {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
                   </p>
                 </div>
-                <p className="text-xs text-emerald-700 mb-3">
-                  Profit {profitRate}%: {unitProfit}K L.L per unit
-                </p>
                 <div className="flex gap-2">
                   <button onClick={() => handleEdit(product)} className="flex-1 py-2 rounded-xl bg-gray-50 border border-gray-100 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
                     Edit
@@ -889,8 +911,7 @@ export default function ManageProducts() {
                 </div>
               </div>
             </div>
-            )
-          })}
+          ))}
         </div>
       )}
     </div>
