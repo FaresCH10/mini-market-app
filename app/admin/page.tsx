@@ -39,14 +39,6 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const now = new Date()
-      const revenueWindowStart = new Date(now)
-      revenueWindowStart.setHours(1, 0, 0, 0)
-      // Between midnight and 00:59, use previous day's 1:00 AM as the reset point.
-      if (now.getHours() < 1) {
-        revenueWindowStart.setDate(revenueWindowStart.getDate() - 1)
-      }
-
       const [
         { count: productsCount },
         { count: usersCount },
@@ -62,7 +54,7 @@ export default function AdminDashboard() {
           .eq('type', 'dept').neq('payment_status', 'paid'),
         supabase.from('orders').select('id, total_price')
           .eq('payment_status', 'paid')
-          .gte('created_at', revenueWindowStart.toISOString()),
+          .order('created_at', { ascending: false }),
         supabase.from('orders').select('total_price, paid_amount')
           .eq('type', 'dept').neq('payment_status', 'paid'),
       ])
@@ -72,7 +64,7 @@ export default function AdminDashboard() {
       if (paidOrderIds.length > 0) {
         const { data: items } = await supabase
           .from('order_items')
-          .select('product_id, quantity')
+          .select('product_id, quantity, price')
           .in('order_id', paidOrderIds)
 
         const productIds = [...new Set((items ?? []).map((it) => it.product_id).filter(Boolean))]
@@ -83,9 +75,10 @@ export default function AdminDashboard() {
         const byId = new Map((productRows ?? []).map((p) => [p.id as string, p]))
         revenue = (items ?? []).reduce((sum, item) => {
           const product = byId.get(item.product_id)
-          if (!product) return sum
-          const basePrice = Number(product.price ?? 0)
-          const sellPrice = Number(product.sell_price ?? Number((basePrice * 1.2).toFixed(2)))
+          const sellPrice = Number(product?.sell_price ?? item.price ?? product?.price ?? 0)
+          const basePrice = product
+            ? Number(product.price ?? 0)
+            : Number((sellPrice / 1.2).toFixed(2))
           const qty = Number(item.quantity ?? 0)
           return sum + Math.max(0, sellPrice - basePrice) * qty
         }, 0)
@@ -112,7 +105,7 @@ export default function AdminDashboard() {
     {
       label: 'Total Revenue',
       value: `${stats.revenue}K L.L`,
-      sub: 'sell price - base price on paid orders',
+      sub: 'sell price - base price on all paid orders',
       href: '/admin/orders',
       color: 'from-emerald-500 to-emerald-600',
       icon: (

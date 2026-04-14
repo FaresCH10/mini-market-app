@@ -67,11 +67,32 @@ export default function ManageProducts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const basePrice = parseFloat(formData.price)
+    const quantity = parseInt(formData.quantity, 10)
+    const parsedSellPrice = parseFloat(formData.sell_price)
+
+    if (!Number.isFinite(basePrice) || basePrice < 0) {
+      toast.error('Please enter a valid base price')
+      return
+    }
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      toast.error('Please enter a valid quantity')
+      return
+    }
+
+    const sellPrice = Number.isFinite(parsedSellPrice)
+      ? parsedSellPrice
+      : Number((basePrice * 1.2).toFixed(2))
+    if (!Number.isFinite(sellPrice) || sellPrice < 0) {
+      toast.error('Please enter a valid sell price')
+      return
+    }
+
     const productData = {
       name: formData.name,
-      price: parseFloat(formData.price),
-      sell_price: parseFloat(formData.sell_price),
-      quantity: parseInt(formData.quantity),
+      price: basePrice,
+      sell_price: sellPrice,
+      quantity,
       image_url: formData.image_url || null,
     }
     try {
@@ -89,7 +110,14 @@ export default function ManageProducts() {
       setShowForm(false)
       setImagePickerUrls([])
       fetchProducts()
-    } catch { toast.error('Failed to save product') }
+    } catch (error) {
+      console.error('Product save error:', error)
+      const message =
+        (typeof error === 'object' && error && 'message' in error && typeof (error as { message?: unknown }).message === 'string')
+          ? (error as { message: string }).message
+          : 'Failed to save product'
+      toast.error(message)
+    }
   }
 
   const handleDelete = async (id: string, name: string) => {
@@ -783,6 +811,7 @@ export default function ManageProducts() {
                 <input type="number" required value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} className={inputCls} placeholder="0" />
               </div>
             </div>
+            <p className="text-xs text-gray-500 -mt-2">Auto-suggests sell price as <span className="font-semibold">price x 1.2</span>, and you can edit it.</p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Image URL <span className="text-gray-400 font-normal">(optional)</span></label>
               <input type="url" value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} className={inputCls} placeholder="https://example.com/image.jpg" />

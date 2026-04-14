@@ -76,11 +76,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     if (showLoading) setLoading(true);
     try {
-      // Prefer sell_price; if DB schema is not migrated yet, fallback gracefully.
-      let data: any[] | null = null;
-      let error: unknown = null;
-
-      const withSellPrice = await supabase
+      const { data, error } = await supabase
         .from("carts")
         .select(
           `
@@ -98,38 +94,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         )
         .eq("user_id", userId);
 
-      data = withSellPrice.data;
-      error = withSellPrice.error;
-
-      const maybeMissingColumn =
-        !!error &&
-        typeof error === "object" &&
-        "message" in error &&
-        typeof (error as { message?: unknown }).message === "string" &&
-        ((error as { message: string }).message.includes("sell_price") ||
-          (error as { message: string }).message.includes("column"));
-
-      if (maybeMissingColumn) {
-        const fallback = await supabase
-          .from("carts")
-          .select(
-            `
-            id,
-            product_id,
-            quantity,
-            products (
-              name,
-              price,
-              quantity,
-              image_url
-            )
-          `,
-          )
-          .eq("user_id", userId);
-        data = fallback.data;
-        error = fallback.error;
-      }
-
       if (error) {
         console.error("Fetch cart error:", error);
         throw error;
@@ -141,7 +105,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           id: item.id,
           product_id: item.product_id,
           name: product?.name ?? "Unknown Product",
-          price: product?.sell_price ?? product?.price ?? 0,
+          price: product?.sell_price ?? Number(((product?.price ?? 0) * 1.2).toFixed(2)),
           quantity: item.quantity,
           stock: product?.quantity ?? 0,
           image_url: product?.image_url ?? "",

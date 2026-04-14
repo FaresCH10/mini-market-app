@@ -789,9 +789,10 @@ async function executeTool(
 
       case "admin_add_product": {
         const { name, price, quantity, image_url } = args as { name: string; price: number; quantity: number; image_url?: string };
+        const sell_price = Number((price * 1.2).toFixed(2));
         const { data, error } = await supabase
           .from("products")
-          .insert({ name, price, quantity, image_url })
+          .insert({ name, price, sell_price, quantity, image_url })
           .select()
           .single();
         if (error) throw error;
@@ -800,6 +801,9 @@ async function executeTool(
 
       case "admin_edit_product": {
         const { product_id, ...updates } = args as { product_id: string; [key: string]: unknown };
+        if (typeof updates.price === "number" && Number.isFinite(updates.price) && updates.sell_price == null) {
+          updates.sell_price = Number((updates.price * 1.2).toFixed(2));
+        }
         const { data, error } = await supabase
           .from("products")
           .update(updates)
