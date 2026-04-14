@@ -11,13 +11,14 @@ type Stats = {
   pendingDebt: number
   revenue: number
   outstandingDebt: number
+  purchaseProfit: number
 }
 
 export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [stats, setStats] = useState<Stats>({
     products: 0, users: 0, totalOrders: 0,
-    pendingDebt: 0, revenue: 0, outstandingDebt: 0,
+    pendingDebt: 0, revenue: 0, outstandingDebt: 0, purchaseProfit: 0,
   })
   const router = useRouter()
   const supabase = createClient()
@@ -54,6 +55,7 @@ export default function AdminDashboard() {
         { count: pendingDebt },
         { data: paidOrders },
         { data: debtOrders },
+        { data: paidOrdersForProfit },
       ] = await Promise.all([
         supabase.from('products').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
@@ -65,12 +67,42 @@ export default function AdminDashboard() {
           .gte('created_at', revenueWindowStart.toISOString()),
         supabase.from('orders').select('total_price, paid_amount')
           .eq('type', 'dept').neq('payment_status', 'paid'),
+        supabase.from('orders').select('id')
+          .eq('payment_status', 'paid')
+          .gte('created_at', revenueWindowStart.toISOString()),
       ])
 
       const revenue = paidOrders?.reduce((s, o) => s + o.total_price, 0) ?? 0
       const outstandingDebt = debtOrders?.reduce(
         (s, o) => s + (o.total_price - (o.paid_amount ?? 0)), 0
       ) ?? 0
+      const paidOrderIds = (paidOrdersForProfit ?? []).map((o) => o.id)
+
+      let purchaseProfit = 0
+      if (paidOrderIds.length > 0) {
+        const { data: orderItems } = await supabase
+          .from('order_items')
+          .select('product_id, quantity, price')
+          .in('order_id', paidOrderIds)
+
+        const productIds = [...new Set((orderItems ?? []).map((it) => it.product_id).filter(Boolean))]
+        let profitMap = new Map<string, number>()
+        if (productIds.length > 0) {
+          const { data: productsWithProfit } = await supabase
+            .from('products')
+            .select('id, profit_percentage')
+            .in('id', productIds)
+          profitMap = new Map(
+            (productsWithProfit ?? []).map((p) => [p.id as string, Number(p.profit_percentage ?? 10)]),
+          )
+        }
+
+        purchaseProfit = (orderItems ?? []).reduce((sum, item) => {
+          const rate = Math.max(0, Math.min(100, profitMap.get(item.product_id) ?? 10))
+          const lineTotal = (item.price ?? 0) * (item.quantity ?? 0)
+          return sum + (lineTotal * rate) / 100
+        }, 0)
+      }
 
       setStats({
         products: productsCount ?? 0,
@@ -79,6 +111,7 @@ export default function AdminDashboard() {
         pendingDebt: pendingDebt ?? 0,
         revenue,
         outstandingDebt,
+        purchaseProfit: Number(purchaseProfit.toFixed(2)),
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
@@ -97,6 +130,18 @@ export default function AdminDashboard() {
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Profit from Purchases',
+      value: `${stats.purchaseProfit}K L.L`,
+      sub: 'from paid purchased products since 1:00 AM',
+      href: '/admin/orders',
+      color: 'from-emerald-600 to-teal-600',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1m0-1a4.5 4.5 0 01-3.5-1.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
     },

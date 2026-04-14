@@ -6,10 +6,12 @@ import { useCart } from "@/context/CartContext";
 import { useEffect, useState } from "react";
 
 type Product = {
-  id: number;
+  id: string;
   name: string;
   quantity: number;
   price: number;
+  image_url?: string | null;
+  profit_percentage?: number | null;
 };
 const MARKET_LOGO_PLACEHOLDER = "/favicon.ico";
 
@@ -24,12 +26,34 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const { items, updateQuantity, removeItem } = useCart();
   const supabase = createClient();
 
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsAdmin(false);
+          return;
+        }
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        setIsAdmin(profile?.role === "admin");
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    checkAdminRole();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProducts = async () => {
     try {
@@ -175,11 +199,15 @@ export default function Home() {
                 const cartQuantity = getCartQuantity(product.id);
                 const isInCart = cartQuantity > 0;
                 const isOutOfStock = product.quantity <= 0;
+                const profitRate = Number.isFinite(product.profit_percentage)
+                  ? Math.max(0, Math.min(100, Number(product.profit_percentage)))
+                  : 10;
+                const profitAmount = Number((product.price * (profitRate / 100)).toFixed(2));
 
                 return (
                   <div
                     key={product.id}
-                    className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col"
+                    className="bg-white  overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col"
                   >
                     {/* Image */}
                     <div className="relative h-48 bg-gray-50">
@@ -188,7 +216,7 @@ export default function Home() {
                           src={safeImg(product.image_url)}
                           alt={product.name}
                           fill
-                          className="object-cover"
+                          className="object-contain"
                         />
                       ) : (
                         <div className="relative w-full h-full">
@@ -196,7 +224,7 @@ export default function Home() {
                             src={MARKET_LOGO_PLACEHOLDER}
                             alt="Market logo"
                             fill
-                            className="object-contain p-8 opacity-90"
+                            className="object-cover p-8 opacity-90"
                           />
                         </div>
                       )}
@@ -221,6 +249,11 @@ export default function Home() {
                       <p className="text-xl font-bold text-[#1B2D72] mb-1">
                         {product.price}K L.L
                       </p>
+                      {isAdmin && (
+                        <p className="text-xs text-emerald-600 mb-1">
+                          Profit ({profitRate}%): {profitAmount}K L.L
+                        </p>
+                      )}
                       {!isOutOfStock && (
                         <p className="text-xs text-gray-400 mb-3">
                           {product.quantity} in stock

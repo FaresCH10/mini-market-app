@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
-type Product = { id: string; name: string; price: number; quantity: number; image_url: string }
+type Product = { id: string; name: string; price: number; quantity: number; image_url: string; profit_percentage: number | null }
 type ImportedRow = { name: string; price: number; quantity: number; image_url?: string }
 type ImportPreview = { valid: ImportedRow[]; errors: { row: number; reason: string }[] }
 type ColumnMap = { name: string; price: string; quantity: string }
@@ -19,12 +19,13 @@ export default function ManageProducts() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [formData, setFormData] = useState({ name: '', price: '', quantity: '', image_url: '' })
+  const [formData, setFormData] = useState({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' })
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
   const [importing, setImporting] = useState(false)
   const [aiParsing, setAiParsing] = useState(false)
+  const [invoiceParsing, setInvoiceParsing] = useState(false)
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [sheetNames, setSheetNames] = useState<string[]>([])
   const [selectedSheet, setSelectedSheet] = useState<string>('')
@@ -36,6 +37,7 @@ export default function ManageProducts() {
   const [bulkImagesRunning, setBulkImagesRunning] = useState(false)
   const [bulkImagesProgress, setBulkImagesProgress] = useState({ current: 0, total: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const invoiceInputRef = useRef<HTMLInputElement>(null)
   const imageUploadRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -70,6 +72,7 @@ export default function ManageProducts() {
       price: parseFloat(formData.price),
       quantity: parseInt(formData.quantity),
       image_url: formData.image_url || null,
+      profit_percentage: Math.max(0, Math.min(100, parseFloat(formData.profit_percentage) || 0)),
     }
     try {
       if (editingProduct) {
@@ -81,7 +84,7 @@ export default function ManageProducts() {
         if (error) throw error
         toast.success('Product added!')
       }
-      setFormData({ name: '', price: '', quantity: '', image_url: '' })
+      setFormData({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' })
       setEditingProduct(null)
       setShowForm(false)
       setImagePickerUrls([])
@@ -101,7 +104,13 @@ export default function ManageProducts() {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
-    setFormData({ name: product.name, price: product.price.toString(), quantity: product.quantity.toString(), image_url: product.image_url || '' })
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      quantity: product.quantity.toString(),
+      image_url: product.image_url || '',
+      profit_percentage: String(product.profit_percentage ?? 10),
+    })
     setShowForm(true)
     setShowImport(false)
   }
@@ -200,11 +209,60 @@ export default function ManageProducts() {
     }
   }
 
+  const handleInvoiceImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('Image is too large (max 8MB)')
+      return
+    }
+
+    const toDataUrl = (f: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(new Error('Failed to read image'))
+        reader.readAsDataURL(f)
+      })
+
+    setInvoiceParsing(true)
+    try {
+      const imageDataUrl = await toDataUrl(file)
+      const res = await fetch('/api/parse-invoice-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl }),
+      })
+      const data = await res.json() as {
+        products?: ImportedRow[]
+        errors?: { row: number; reason: string }[]
+        error?: string
+      }
+      if (!res.ok) throw new Error(data.error ?? 'Invoice parsing failed')
+      const products = data.products ?? []
+      if (!products.length) {
+        toast.error('AI found no products in this invoice')
+        return
+      }
+      setImportPreview({ valid: products, errors: data.errors ?? [] })
+      toast.success(`AI extracted ${products.length} products from invoice`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Invoice parsing failed')
+    } finally {
+      setInvoiceParsing(false)
+      if (invoiceInputRef.current) invoiceInputRef.current.value = ''
+    }
+  }
+
   const handleConfirmImport = async () => {
     if (!importPreview?.valid.length) return
     setImporting(true)
     try {
-      const { error } = await supabase.from('products').insert(importPreview.valid.map(p => ({ ...p, image_url: p.image_url || null })))
+      const { error } = await supabase.from('products').insert(importPreview.valid.map(p => ({ ...p, image_url: p.image_url || null, profit_percentage: 10 })))
       if (error) throw error
       toast.success(`${importPreview.valid.length} products imported!`)
       setImportPreview(null)
@@ -397,7 +455,7 @@ export default function ManageProducts() {
             Import Excel
           </button>
           <button
-            onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '' }); setShowForm(!showForm); setShowImport(false) }}
+            onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' }); setShowForm(!showForm); setShowImport(false) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,9 +470,51 @@ export default function ManageProducts() {
       {showImport && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 space-y-5">
           <div>
-            <h2 className="font-bold text-gray-900">Import from Excel</h2>
-            <p className="text-sm text-gray-400 mt-0.5">Supports multi-tab files. Pick a sheet, map the columns, then preview.</p>
+            <h2 className="font-bold text-gray-900">Import Products</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Use Excel or invoice photo AI parsing, then review products in the table before importing.</p>
           </div>
+
+          {/* Invoice photo import */}
+          <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-violet-900">Import from invoice photo</p>
+                <p className="text-xs text-violet-700">Upload an invoice image and AI will extract product name, price (K L.L), and quantity.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => invoiceInputRef.current?.click()}
+                disabled={invoiceParsing}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors"
+              >
+                {invoiceParsing ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Reading invoice…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Import Invoice Photo
+                  </>
+                )}
+              </button>
+              <input
+                ref={invoiceInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleInvoiceImageChange}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <div className="h-px bg-gray-100" />
 
           {/* Step 1 — File picker */}
           <div className="flex flex-wrap gap-3 items-center">
@@ -641,7 +741,7 @@ export default function ManageProducts() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Product Name *</label>
               <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={inputCls} placeholder="Enter product name" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (K L.L) *</label>
                 <input type="number" step="0.01" required value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} className={inputCls} placeholder="0" />
@@ -649,6 +749,10 @@ export default function ManageProducts() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Quantity *</label>
                 <input type="number" required value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} className={inputCls} placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Profit % *</label>
+                <input type="number" min={0} max={100} step="0.1" required value={formData.profit_percentage} onChange={e => setFormData({ ...formData, profit_percentage: e.target.value })} className={inputCls} placeholder="10" />
               </div>
             </div>
             <div>
@@ -728,7 +832,7 @@ export default function ManageProducts() {
               <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors">
                 {editingProduct ? 'Update Product' : 'Add Product'}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', quantity: '', image_url: '', profit_percentage: '10' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
@@ -749,7 +853,10 @@ export default function ManageProducts() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product) => (
+          {products.map((product) => {
+            const profitRate = Number.isFinite(product.profit_percentage) ? Number(product.profit_percentage) : 10
+            const unitProfit = Number((product.price * (Math.max(0, Math.min(100, profitRate)) / 100)).toFixed(2))
+            return (
             <div key={product.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
               <div className="h-44 bg-gray-50 relative overflow-hidden">
                 {product.image_url ? (
@@ -769,6 +876,9 @@ export default function ManageProducts() {
                     {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
                   </p>
                 </div>
+                <p className="text-xs text-emerald-700 mb-3">
+                  Profit {profitRate}%: {unitProfit}K L.L per unit
+                </p>
                 <div className="flex gap-2">
                   <button onClick={() => handleEdit(product)} className="flex-1 py-2 rounded-xl bg-gray-50 border border-gray-100 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
                     Edit
@@ -779,7 +889,8 @@ export default function ManageProducts() {
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
