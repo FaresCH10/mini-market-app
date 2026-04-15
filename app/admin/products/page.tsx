@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
-import { formatLira, kToLira, liraToK } from '@/lib/currency'
+import { formatLira, formatDollar, kToLira, liraToK } from '@/lib/currency'
+import Link from 'next/link'
 
 type Product = { id: string; name: string; price: number; sell_price: number | null; quantity: number; image_url: string }
 type ImportedRow = { name: string; price: number; quantity: number; image_url?: string }
@@ -14,13 +15,98 @@ type ColumnMap = { name: string; price: string; quantity: string }
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
 const MARKET_LOGO_PLACEHOLDER = '/favicon.ico'
 const PRODUCT_IMAGES_BUCKET = 'product-images'
+const DEFAULT_EXCHANGE_RATE = 90_000
+const EXCHANGE_RATE_STORAGE_KEY = 'mm_exchange_rate'
 
 export default function ManageProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [formData, setFormData] = useState({ name: '', price: '', sell_price: '', quantity: '', image_url: '' })
+  const [formData, setFormData] = useState({ name: '', price_usd: '', price: '', sell_price: '', quantity: '', image_url: '' })
+
+  const [exchangeRate, setExchangeRate] = useState<number>(() => {
+    if (typeof window === 'undefined') return DEFAULT_EXCHANGE_RATE
+    return Number(localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY)) || DEFAULT_EXCHANGE_RATE
+  })
+  const [rateInput, setRateInput] = useState<string>(() => {
+    if (typeof window === 'undefined') return String(DEFAULT_EXCHANGE_RATE)
+    return String(Number(localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY)) || DEFAULT_EXCHANGE_RATE)
+  })
+
+  const applyExchangeRate = (rate: number) => {
+    setExchangeRate(rate)
+    setRateInput(String(rate))
+    localStorage.setItem(EXCHANGE_RATE_STORAGE_KEY, String(rate))
+  }
+
+  const fetchDollarRateFromSettings = async () => {
+    let row: Record<string, unknown> | null = null
+
+    // Preferred query when settings is key/value with dollar_rate payload.
+    const primary = await supabase
+      .from('settings')
+      .select('key, dollar_rate, value')
+      .eq('key', 'dollar_rate')
+      .maybeSingle()
+
+    if (!primary.error) {
+      row = (primary.data as Record<string, unknown> | null) ?? null
+    } else {
+      // Fallback for schema variants without one of the selected columns.
+      const fallback = await supabase
+        .from('settings')
+        .select('*')
+        .eq('key', 'dollar_rate')
+        .maybeSingle()
+      if (fallback.error) throw fallback.error
+      row = (fallback.data as Record<string, unknown> | null) ?? null
+    }
+
+    if (!row) return false
+
+    const rawRate = row.dollar_rate ?? row.value
+    const parsedRate = Number(rawRate)
+    if (!Number.isFinite(parsedRate) || parsedRate <= 0) return false
+
+    applyExchangeRate(parsedRate)
+    return true
+  }
+
+  const saveRate = async () => {
+    const r = Number(rateInput)
+    if (!Number.isFinite(r) || r <= 0) {
+      toast.error('Please enter a valid dollar rate')
+      return
+    }
+
+    // Keep UI snappy even if DB roundtrip is slow.
+    applyExchangeRate(r)
+
+    const upsertWithDollarRate = () =>
+      supabase
+        .from('settings')
+        .upsert({ key: 'dollar_rate', dollar_rate: r }, { onConflict: 'key' })
+
+    const upsertWithValue = () =>
+      supabase
+        .from('settings')
+        .upsert({ key: 'dollar_rate', value: r }, { onConflict: 'key' })
+
+    const primary = await upsertWithDollarRate()
+    if (!primary.error) {
+      toast.success('Dollar rate updated')
+      return
+    }
+
+    const fallback = await upsertWithValue()
+    if (!fallback.error) {
+      toast.success('Dollar rate updated')
+      return
+    }
+
+    toast.error('Failed to save dollar rate')
+  }
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
@@ -52,6 +138,12 @@ export default function ManageProducts() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { toast.error('Access denied'); router.push('/'); return }
       setIsAdmin(true)
+      const loadedFromSettings = await fetchDollarRateFromSettings()
+      if (!loadedFromSettings) {
+        // Keep cached/browser rate if settings row is absent or invalid.
+        const cached = Number(localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY)) || DEFAULT_EXCHANGE_RATE
+        applyExchangeRate(cached)
+      }
       fetchProducts()
     } catch { router.push('/') }
   }
@@ -66,9 +158,20 @@ export default function ManageProducts() {
     finally { setLoading(false) }
   }
 
+  const handleUsdChange = (value: string) => {
+    const usd = parseFloat(value)
+    const ll = Number.isFinite(usd) && usd > 0 ? Math.round(usd * exchangeRate) : 0
+    setFormData(prev => ({
+      ...prev,
+      price_usd: value,
+      price: ll > 0 ? String(ll) : '',
+      sell_price: ll > 0 ? String(Math.round(ll * 1.2)) : '',
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const basePriceLira = parseFloat(formData.price)
+    const basePriceLira = parseFloat(formData.price_usd) * exchangeRate
     const basePrice = liraToK(basePriceLira)
     const quantity = parseInt(formData.quantity, 10)
     const parsedSellPriceLira = parseFloat(formData.sell_price)
@@ -108,7 +211,7 @@ export default function ManageProducts() {
         if (error) throw error
         toast.success('Product added!')
       }
-      setFormData({ name: '', price: '', sell_price: '', quantity: '', image_url: '' })
+      setFormData({ name: '', price_usd: '', price: '', sell_price: '', quantity: '', image_url: '' })
       setEditingProduct(null)
       setShowForm(false)
       setImagePickerUrls([])
@@ -137,6 +240,7 @@ export default function ManageProducts() {
     setEditingProduct(product)
     setFormData({
       name: product.name,
+      price_usd: (kToLira(product.price) / exchangeRate).toFixed(2),
       price: kToLira(product.price).toString(),
       sell_price: kToLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2))).toString(),
       quantity: product.quantity.toString(),
@@ -457,7 +561,21 @@ export default function ManageProducts() {
             )}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Exchange rate editor */}
+          <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 py-2 bg-white text-sm">
+            <span className="text-gray-500 text-xs font-medium whitespace-nowrap">Rate:</span>
+            <input
+              type="number"
+              min={1}
+              value={rateInput}
+              onChange={e => setRateInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveRate()}
+              onBlur={saveRate}
+              className="w-20 border-0 text-xs text-gray-700 font-semibold focus:outline-none bg-transparent"
+            />
+            <span className="text-gray-400 text-xs">L.L/$</span>
+          </div>
           <button
             type="button"
             onClick={handleBulkFillAllImages}
@@ -490,8 +608,17 @@ export default function ManageProducts() {
             </svg>
             Import Excel
           </button>
+          <Link
+            href="/admin/products/edit"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#1B2D72] text-sm font-medium text-[#1B2D72] hover:bg-[#1B2D72] hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5h10M11 9h7m-7 4h10m-10 4h7M4 6h.01M4 10h.01M4 14h.01M4 18h.01" />
+            </svg>
+            Edit Table
+          </Link>
           <button
-            onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', sell_price: '', quantity: '', image_url: '' }); setShowForm(!showForm); setShowImport(false) }}
+            onClick={() => { setEditingProduct(null); setFormData({ name: '', price_usd: '', price: '', sell_price: '', quantity: '', image_url: '' }); setShowForm(!showForm); setShowImport(false) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -779,24 +906,22 @@ export default function ManageProducts() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (L.L) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price ($) *</label>
                 <input
                   type="number"
-                  step="1"
+                  step="0.01"
+                  min="0"
                   required
-                  value={formData.price}
-                  onChange={e => {
-                    const price = e.target.value
-                    const priceNum = parseFloat(price)
-                    setFormData({
-                      ...formData,
-                      price,
-                      sell_price: Number.isFinite(priceNum) ? (priceNum * 1.2).toFixed(2) : '',
-                    })
-                  }}
+                  value={formData.price_usd}
+                  onChange={e => handleUsdChange(e.target.value)}
                   className={inputCls}
-                  placeholder="0"
+                  placeholder="0.00"
                 />
+                {formData.price && (
+                  <p className="mt-1 text-xs text-gray-400">
+                    ≈ {Number(formData.price).toLocaleString()} L.L
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Sell Price (L.L) *</label>
@@ -893,7 +1018,7 @@ export default function ManageProducts() {
               <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors">
                 {editingProduct ? 'Update Product' : 'Add Product'}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price: '', sell_price: '', quantity: '', image_url: '' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price_usd: '', price: '', sell_price: '', quantity: '', image_url: '' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
@@ -918,7 +1043,7 @@ export default function ManageProducts() {
             <div key={product.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
               <div className="h-44 bg-gray-50 relative overflow-hidden">
                 {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" />
                 ) : (
                   <img src={MARKET_LOGO_PLACEHOLDER} alt="Market logo" className="w-full h-full object-contain p-6 opacity-90" />
                 )}
@@ -929,7 +1054,10 @@ export default function ManageProducts() {
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                 <div className="flex items-center justify-between mt-1 mb-3">
-                  <p className="text-lg font-bold text-[#1B2D72]">{formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}</p>
+                  <div>
+                    <p className="text-lg font-bold text-[#1B2D72]">{formatDollar(product.sell_price ?? Number((product.price * 1.2).toFixed(2)), exchangeRate)}</p>
+                    <p className="text-xs text-gray-400">{formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}</p>
+                  </div>
                   <p className={`text-xs font-medium px-2 py-0.5 rounded-full ${product.quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                     {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
                   </p>

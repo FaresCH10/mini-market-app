@@ -414,7 +414,7 @@ async function executeTool(
       case "get_products": {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, price, quantity")
+          .select("id, name, price, sell_price, quantity")
           .order("name");
         if (error) throw error;
         return JSON.stringify(data);
@@ -423,7 +423,7 @@ async function executeTool(
       case "get_cart": {
         const { data, error } = await supabase
           .from("carts")
-          .select("id, quantity, products(id, name, price)")
+          .select("id, quantity, products(id, name, price, sell_price)")
           .eq("user_id", userId);
         if (error) throw error;
         return JSON.stringify(data);
@@ -572,11 +572,11 @@ async function executeTool(
         const productIds = (cartRaw as { product_id: string; quantity: number }[]).map((r) => r.product_id);
         const { data: productsRaw, error: prodError } = await supabase
           .from("products")
-          .select("id, name, price, quantity")
+          .select("id, name, price, sell_price, quantity")
           .in("id", productIds);
         if (prodError) throw new Error(`Products fetch failed: ${prodError.message}`);
 
-        type ProductRow = { id: string; name: string; price: number; quantity: number };
+        type ProductRow = { id: string; name: string; price: number; sell_price: number | null; quantity: number };
         const productMap = Object.fromEntries(
           (productsRaw as ProductRow[]).map((p) => [p.id, p]),
         );
@@ -587,7 +587,10 @@ async function executeTool(
           return { quantity: row.quantity, product };
         });
 
-        const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+        const total = items.reduce((sum, item) => {
+          const sellPrice = Number(item.product.sell_price ?? Number((item.product.price * 1.2).toFixed(2)));
+          return sum + sellPrice * item.quantity;
+        }, 0);
 
         const { payment_type: paymentType, paid_now: paidNowArg } = args as { payment_type?: string; paid_now?: number };
         let paidNow: number;
@@ -621,11 +624,12 @@ async function executeTool(
 
         const { error: itemsError } = await supabase.from("order_items").insert(
           items.map((item) => ({
+            // Store sell price at purchase-time for accurate revenue reporting.
+            price: Number(item.product.sell_price ?? Number((item.product.price * 1.2).toFixed(2))),
             order_id: orderId,
             product_id: item.product.id,
             product_name: item.product.name,
             quantity: item.quantity,
-            price: item.product.price,
           })),
         );
         if (itemsError) throw itemsError;

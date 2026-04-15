@@ -4,7 +4,7 @@ import Image from "next/image";
 import AddToCartButton from "@/components/AddToCartButton";
 import { useCart } from "@/context/CartContext";
 import { useEffect, useState } from "react";
-import { formatLira } from "@/lib/currency";
+import { formatLira, formatDollar } from "@/lib/currency";
 
 type Product = {
   id: string;
@@ -27,6 +27,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [exchangeRate] = useState<number>(() => {
+    if (typeof window === "undefined") return 90_000;
+    return Number(localStorage.getItem("mm_exchange_rate")) || 90_000;
+  });
   const { items, updateQuantity, removeItem } = useCart();
   const supabase = createClient();
 
@@ -221,7 +225,10 @@ export default function Home() {
                       <h2 className="font-semibold text-gray-900 mb-1 leading-tight">
                         {product.name}
                       </h2>
-                      <p className="text-xl font-bold text-[#1B2D72] mb-1">
+                      <p className="text-xl font-bold text-[#1B2D72] mb-0.5">
+                        {formatDollar(product.sell_price ?? Number((product.price * 1.2).toFixed(2)), exchangeRate)}
+                      </p>
+                      <p className="text-sm text-gray-400 mb-1">
                         {formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}
                       </p>
                       {!isOutOfStock && (

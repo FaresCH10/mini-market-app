@@ -24,6 +24,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -72,6 +73,34 @@ export default function OrdersPage() {
       result = result.filter(o => o.user_name.toLowerCase().includes(q) || o.user_email.toLowerCase().includes(q) || o.id.toLowerCase().includes(q));
     }
     setFiltered(result);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    const confirmed = window.confirm("Delete this order permanently? This cannot be undone.");
+    if (!confirmed) return;
+
+    setDeletingId(orderId);
+    try {
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .delete()
+        .eq("order_id", orderId);
+      if (itemsError) throw itemsError;
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", orderId);
+      if (orderError) throw orderError;
+
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      if (expandedId === orderId) setExpandedId(null);
+      toast.success("Order deleted");
+    } catch {
+      toast.error("Failed to delete order");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const totalRevenue = orders.filter(o => o.payment_status === "paid").reduce((s, o) => s + o.total_price, 0);
@@ -191,6 +220,15 @@ export default function OrdersPage() {
                         <p className="text-xs text-gray-400">Paid {formatLira(order.paid_amount)} of {formatLira(order.total_price)} ({((order.paid_amount / order.total_price) * 100).toFixed(0)}%)</p>
                       </div>
                     )}
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        disabled={deletingId === order.id}
+                        className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {deletingId === order.id ? "Deleting..." : "Delete Order"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
