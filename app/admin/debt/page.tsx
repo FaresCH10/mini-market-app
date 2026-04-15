@@ -32,21 +32,10 @@ export default function DebtPage() {
   const fetchDebtOrders = async () => {
     setLoading(true);
     try {
-      const { data: ordersData, error } = await supabase.from("orders")
-        .select("id, total_price, paid_amount, payment_status, status, created_at, user_id")
-        .eq("type", "dept").neq("payment_status", "paid").order("created_at", { ascending: true });
-      if (error) throw error;
-      if (!ordersData?.length) { setOrders([]); setLoading(false); return; }
-
-      const userIds = ordersData.map(o => o.user_id);
-      const { data: profilesData } = await supabase.from("profiles").select("id, name, email").in("id", userIds);
-
-      const ordersWithDetails = await Promise.all(ordersData.map(async order => {
-        const { data: itemsData } = await supabase.from("order_items").select("product_name, quantity, price").eq("order_id", order.id);
-        const userProfile = profilesData?.find(p => p.id === order.user_id);
-        return { ...order, user_name: userProfile?.name || "Unknown", user_email: userProfile?.email || "Unknown", items: itemsData || [] };
-      }));
-      setOrders(ordersWithDetails);
+      const res = await fetch("/api/admin/orders-data?mode=debt");
+      const body = await res.json() as { orders?: DebtOrder[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Failed to load debts");
+      setOrders(body.orders ?? []);
     } catch { toast.error("Failed to load debts"); }
     finally { setLoading(false); }
   };

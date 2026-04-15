@@ -45,21 +45,10 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const { data: ordersData, error } = await supabase.from("orders")
-        .select("id, total_price, paid_amount, type, status, payment_status, created_at, user_id")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      if (!ordersData?.length) { setOrders([]); return; }
-
-      const userIds = [...new Set(ordersData.map(o => o.user_id))];
-      const { data: profilesData } = await supabase.from("profiles").select("id, name, email").in("id", userIds);
-
-      const ordersWithDetails = await Promise.all(ordersData.map(async order => {
-        const { data: itemsData } = await supabase.from("order_items").select("product_name, quantity, price").eq("order_id", order.id);
-        const userProfile = profilesData?.find(p => p.id === order.user_id);
-        return { ...order, user_name: userProfile?.name || "Unknown", user_email: userProfile?.email || "Unknown", items: itemsData || [] };
-      }));
-      setOrders(ordersWithDetails);
+      const res = await fetch("/api/admin/orders-data?mode=all");
+      const body = await res.json() as { orders?: Order[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Failed to load orders");
+      setOrders(body.orders ?? []);
     } catch { toast.error("Failed to load orders"); }
     finally { setLoading(false); }
   };
