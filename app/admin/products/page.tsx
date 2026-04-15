@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
+import { formatLira, kToLira, liraToK } from '@/lib/currency'
 
 type Product = { id: string; name: string; price: number; sell_price: number | null; quantity: number; image_url: string }
 type ImportedRow = { name: string; price: number; quantity: number; image_url?: string }
@@ -67,11 +68,13 @@ export default function ManageProducts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const basePrice = parseFloat(formData.price)
+    const basePriceLira = parseFloat(formData.price)
+    const basePrice = liraToK(basePriceLira)
     const quantity = parseInt(formData.quantity, 10)
-    const parsedSellPrice = parseFloat(formData.sell_price)
+    const parsedSellPriceLira = parseFloat(formData.sell_price)
+    const parsedSellPrice = liraToK(parsedSellPriceLira)
 
-    if (!Number.isFinite(basePrice) || basePrice < 0) {
+    if (!Number.isFinite(basePriceLira) || basePriceLira < 0) {
       toast.error('Please enter a valid base price')
       return
     }
@@ -134,8 +137,8 @@ export default function ManageProducts() {
     setEditingProduct(product)
     setFormData({
       name: product.name,
-      price: product.price.toString(),
-      sell_price: (product.sell_price ?? Number((product.price * 1.2).toFixed(2))).toString(),
+      price: kToLira(product.price).toString(),
+      sell_price: kToLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2))).toString(),
       quantity: product.quantity.toString(),
       image_url: product.image_url || '',
     })
@@ -292,8 +295,9 @@ export default function ManageProducts() {
     try {
       const { error } = await supabase.from('products').insert(importPreview.valid.map(p => ({
         ...p,
+        price: liraToK(p.price),
         image_url: p.image_url || null,
-        sell_price: Number((p.price * 1.2).toFixed(2)),
+        sell_price: Number((liraToK(p.price) * 1.2).toFixed(2)),
       })))
       if (error) throw error
       toast.success(`${importPreview.valid.length} products imported!`)
@@ -311,7 +315,7 @@ export default function ManageProducts() {
   }
 
   const downloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([['name', 'price', 'quantity', 'image_url'], ['Sample Product', 15, 100, ''], ['Another Product', 25, 50, '']])
+    const ws = XLSX.utils.aoa_to_sheet([['name', 'price', 'quantity', 'image_url'], ['Sample Product', 15000, 100, ''], ['Another Product', 25000, 50, '']])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Products')
     XLSX.writeFile(wb, 'products_template.xlsx')
@@ -511,7 +515,7 @@ export default function ManageProducts() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-violet-900">Import from invoice photo</p>
-                <p className="text-xs text-violet-700">Upload an invoice image and AI will extract product name, price (K L.L), and quantity.</p>
+                <p className="text-xs text-violet-700">Upload an invoice image and AI will extract product name, price (L.L), and quantity.</p>
               </div>
               <button
                 type="button"
@@ -673,7 +677,7 @@ export default function ManageProducts() {
                       <thead className="bg-gray-50 text-left sticky top-0 z-10">
                         <tr>
                           <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Price (K L.L)</th>
+                          <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Price (L.L)</th>
                           <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Qty</th>
                           <th className="px-3 py-2.5 w-8" />
                         </tr>
@@ -698,7 +702,7 @@ export default function ManageProducts() {
                               <input
                                 type="number"
                                 min={0}
-                                step="0.001"
+                                step="1"
                                 value={p.price}
                                 onChange={e => setImportPreview(prev => {
                                   if (!prev) return prev
@@ -775,10 +779,10 @@ export default function ManageProducts() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (K L.L) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (L.L) *</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   required
                   value={formData.price}
                   onChange={e => {
@@ -795,10 +799,10 @@ export default function ManageProducts() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Sell Price (K L.L) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Sell Price (L.L) *</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   required
                   value={formData.sell_price}
                   onChange={e => setFormData({ ...formData, sell_price: e.target.value })}
@@ -925,7 +929,7 @@ export default function ManageProducts() {
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                 <div className="flex items-center justify-between mt-1 mb-3">
-                  <p className="text-lg font-bold text-[#1B2D72]">{product.sell_price ?? Number((product.price * 1.2).toFixed(2))}K L.L</p>
+                  <p className="text-lg font-bold text-[#1B2D72]">{formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}</p>
                   <p className={`text-xs font-medium px-2 py-0.5 rounded-full ${product.quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                     {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
                   </p>

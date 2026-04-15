@@ -4,6 +4,7 @@ import Image from "next/image";
 import AddToCartButton from "@/components/AddToCartButton";
 import { useCart } from "@/context/CartContext";
 import { useEffect, useState } from "react";
+import { formatLira } from "@/lib/currency";
 
 type Product = {
   id: string;
@@ -221,7 +222,7 @@ export default function Home() {
                         {product.name}
                       </h2>
                       <p className="text-xl font-bold text-[#1B2D72] mb-1">
-                        {product.sell_price ?? Number((product.price * 1.2).toFixed(2))}K L.L
+                        {formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}
                       </p>
                       {!isOutOfStock && (
                         <p className="text-xs text-gray-400 mb-3">

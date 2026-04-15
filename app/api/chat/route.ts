@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { formatLira, liraToK } from "@/lib/currency";
 
 // ─── Lazy clients — created inside the handler to avoid module-level crashes
 //     if env vars are missing (which would break the entire app startup).
@@ -25,7 +26,7 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
     function: {
       name: "get_products",
       description:
-        "List all available products with name, price (in K L.L), and stock quantity.",
+        "List all available products with name, price (in L.L), and stock quantity.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
@@ -119,7 +120,7 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
       description: `Place an order for all cart items. Call this immediately — do NOT ask for confirmation first.
 - "pay now" / "buy" / "purchase" / "pay in full" → payment_type = "pay_now"
 - "debt" / "pay later" / "on debt" / "I'll pay later" → payment_type = "debt"
-- "pay X now" / "half now" / "split" → payment_type = "split", paid_now = the amount paying now (number in K L.L)`,
+- "pay X now" / "half now" / "split" → payment_type = "split", paid_now = the amount paying now (number in L.L)`,
       parameters: {
         type: "object",
         properties: {
@@ -130,7 +131,7 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
           },
           paid_now: {
             anyOf: [{ type: "number" }, { type: "null" }],
-            description: "Only required for payment_type=split: the amount paying now in K L.L. Omit or null for pay_now and debt.",
+            description: "Only required for payment_type=split: the amount paying now in L.L. Omit or null for pay_now and debt.",
           },
         },
         required: ["payment_type"],
@@ -157,14 +158,14 @@ const USER_TOOLS: Groq.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "pay_debt",
-      description: "Record a payment toward one of the user's outstanding debt orders. Call get_my_debts first to get the order_id. Pass a specific amount in K L.L, or null to pay the full remaining balance.",
+      description: "Record a payment toward one of the user's outstanding debt orders. Call get_my_debts first to get the order_id. Pass a specific amount in L.L, or null to pay the full remaining balance.",
       parameters: {
         type: "object",
         properties: {
           order_id: { type: "string", description: "The debt order ID from get_my_debts" },
           amount: {
             anyOf: [{ type: "number" }, { type: "null" }],
-            description: "Amount to pay in K L.L. Pass null to pay the full remaining balance.",
+            description: "Amount to pay in L.L. Pass null to pay the full remaining balance.",
           },
         },
         required: ["order_id", "amount"],
@@ -234,7 +235,7 @@ const ADMIN_EXTRA_TOOLS: Groq.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "admin_add_product",
-      description: "Admin: Add a new product to the store. Price is in K L.L.",
+      description: "Admin: Add a new product to the store. Price is in L.L.",
       parameters: {
         type: "object",
         properties: {
@@ -251,7 +252,7 @@ const ADMIN_EXTRA_TOOLS: Groq.Chat.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "admin_edit_product",
-      description: "Admin: Edit an existing product's name, price (K L.L), or stock quantity. Call get_products first to get the product_id.",
+      description: "Admin: Edit an existing product's name, price (L.L), or stock quantity. Call get_products first to get the product_id.",
       parameters: {
         type: "object",
         properties: {
@@ -294,7 +295,7 @@ const ADMIN_EXTRA_TOOLS: Groq.Chat.ChatCompletionTool[] = [
         type: "object",
         properties: {
           order_id: { type: "string" },
-          paid_amount: { type: "number", description: "New total paid amount in K L.L" },
+          paid_amount: { type: "number", description: "New total paid amount in L.L" },
           payment_status: { type: "string", enum: ["pending", "partial", "paid"] },
         },
         required: ["order_id", "paid_amount", "payment_status"],
@@ -330,7 +331,7 @@ const ADMIN_EXTRA_TOOLS: Groq.Chat.ChatCompletionTool[] = [
 // ─── Currency helper ─────────────────────────────────────────────────────────
 
 function fmt(amount: number) {
-  return `${amount.toLocaleString()} K L.L`;
+  return formatLira(amount);
 }
 
 /** Resolve a product by id (preferred) or catalog name so the model is not forced to copy UUIDs perfectly. */
@@ -593,7 +594,7 @@ async function executeTool(
         if (paymentType === "debt") {
           paidNow = 0;
         } else if (paymentType === "split" && typeof paidNowArg === "number") {
-          paidNow = Math.max(0, Math.min(paidNowArg, total));
+          paidNow = Math.max(0, Math.min(liraToK(paidNowArg), total));
         } else {
           paidNow = total; // pay_now or fallback
         }
@@ -715,7 +716,7 @@ async function executeTool(
         if (remaining <= 0) return JSON.stringify({ error: "This debt is already fully paid." });
 
         // null or 0 means pay the full remaining balance
-        const paying = (rawAmount === null || rawAmount <= 0) ? remaining : Math.min(rawAmount, remaining);
+        const paying = (rawAmount === null || rawAmount <= 0) ? remaining : Math.min(liraToK(rawAmount), remaining);
         const newPaid = (o.paid_amount ?? 0) + paying;
         const isFullyPaid = newPaid >= o.total_price;
         const newStatus = isFullyPaid ? "paid" : "partial";
@@ -789,10 +790,11 @@ async function executeTool(
 
       case "admin_add_product": {
         const { name, price, quantity, image_url } = args as { name: string; price: number; quantity: number; image_url?: string };
-        const sell_price = Number((price * 1.2).toFixed(2));
+        const priceK = liraToK(price);
+        const sell_price = Number((priceK * 1.2).toFixed(2));
         const { data, error } = await supabase
           .from("products")
-          .insert({ name, price, sell_price, quantity, image_url })
+          .insert({ name, price: priceK, sell_price, quantity, image_url })
           .select()
           .single();
         if (error) throw error;
@@ -801,6 +803,12 @@ async function executeTool(
 
       case "admin_edit_product": {
         const { product_id, ...updates } = args as { product_id: string; [key: string]: unknown };
+        if (typeof updates.price === "number" && Number.isFinite(updates.price)) {
+          updates.price = liraToK(updates.price);
+        }
+        if (typeof updates.sell_price === "number" && Number.isFinite(updates.sell_price)) {
+          updates.sell_price = liraToK(updates.sell_price);
+        }
         if (typeof updates.price === "number" && Number.isFinite(updates.price) && updates.sell_price == null) {
           updates.sell_price = Number((updates.price * 1.2).toFixed(2));
         }
@@ -850,7 +858,7 @@ async function executeTool(
         const { order_id, paid_amount, payment_status } = args as { order_id: string; paid_amount?: number; payment_status?: string };
 
         const updates: Record<string, unknown> = {};
-        if (paid_amount !== undefined) updates.paid_amount = paid_amount;
+        if (paid_amount !== undefined) updates.paid_amount = liraToK(paid_amount);
         if (payment_status) updates.payment_status = payment_status;
         if (payment_status === "paid") updates.status = "completed";
 
@@ -982,7 +990,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = isAdmin
       ? `You are a smart AI assistant for NavyBits Market, a mini-market management system.
 You are talking to ${userName}, who is an ADMIN.
-CURRENCY: All prices and amounts are in K L.L (Lebanese Pounds ÷ 1000). Always display as "X K L.L".
+CURRENCY: All prices and amounts are in full L.L. Always display as "X L.L" with thousands separators.
 IMPORTANT: No wallet feature exists on this site. Never mention wallets or balances.
 
 ━━ NAVIGATION RULES ━━
@@ -1028,11 +1036,11 @@ USERS
 
 ━━ RESPONSE RULES ━━
 - Present data as clean bullet lists — never dump raw JSON or UUIDs
-- Use names, emails, dates, and K L.L amounts only
+- Use names, emails, dates, and L.L amounts only
 - Be concise and professional`
       : `You are a friendly shopping assistant for NavyBits Market.
 You are helping ${userName}.
-CURRENCY: All prices are in K L.L (Lebanese Pounds ÷ 1000). Always display as "X K L.L".
+CURRENCY: All prices are in full L.L. Always display as "X L.L" with thousands separators.
 IMPORTANT: No wallet feature exists on this site. Never mention wallets or balances.
 
 ━━ NAVIGATION RULES ━━
@@ -1057,7 +1065,7 @@ CART
 ORDERING
 When the user wants to place an order (says "buy", "purchase", "confirm order", "checkout", etc.):
 1. Call get_cart to get the total (if you don't already have it)
-2. Ask: "Would you like to pay now (X K L.L) or put it on debt?"
+2. Ask: "Would you like to pay now (X L.L) or put it on debt?"
 3. Wait for their answer, then call confirm_purchase:
    - "pay now" / "pay in full" / "yes pay" → payment_type="pay_now"
    - "debt" / "pay later" / "on debt" / "later" → payment_type="debt"
@@ -1066,7 +1074,7 @@ When the user wants to place an order (says "buy", "purchase", "confirm order", 
 DEBTS
 - Check outstanding debts: get_my_debts (shows each debt with remaining balance)
 - Pay debt: call get_my_debts first, then pay_debt with the order_id
-  · "pay 50 K L.L on my debt" / "pay 200 toward my order" → amount=50 / amount=200
+  · "pay 50,000 L.L on my debt" / "pay 200,000 toward my order" → amount=50000 / amount=200000
   · "pay all my debt" / "settle my debt" / "pay everything" → amount=null (pays full remaining balance)
 - View debt page: navigate_to /debt
 

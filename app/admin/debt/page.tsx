@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { formatLira, kToLira, liraToK } from "@/lib/currency";
 
 type DebtOrder = { id: string; total_price: number; paid_amount: number; payment_status: string; status: string; created_at: string; user_name: string; user_email: string; user_id: string; items: any[] };
 
@@ -100,7 +101,7 @@ export default function DebtPage() {
   };
 
   const handlePartialPayment = async (orderId: string, totalAmount: number) => {
-    const amount = paymentAmount[orderId];
+    const amount = liraToK(paymentAmount[orderId] ?? 0);
     if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
     const currentOrder = orders.find((o) => o.id === orderId);
     if (!currentOrder) { toast.error("Order not found"); return; }
@@ -128,7 +129,7 @@ export default function DebtPage() {
         toast.success("Order fully paid!");
         setOrders((prev) => prev.filter((o) => o.id !== orderId));
       } else {
-        toast.success(`Payment of ${amount}K L.L recorded`);
+        toast.success(`Payment of ${formatLira(amount)} recorded`);
         await fetchDebtOrders();
       }
     } catch {
@@ -179,7 +180,7 @@ export default function DebtPage() {
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-5">
               <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">Outstanding Debt</p>
-              <p className="text-2xl font-bold text-orange-600">{totalOutstanding}K L.L</p>
+              <p className="text-2xl font-bold text-orange-600">{formatLira(totalOutstanding)}</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">Pending Orders</p>
@@ -210,9 +211,9 @@ export default function DebtPage() {
                         <p className="text-xs text-gray-400 mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-500">Total: {order.total_price}K L.L</p>
-                        {order.paid_amount > 0 && <p className="text-sm text-emerald-600">Paid: {order.paid_amount}K L.L</p>}
-                        <p className="text-xl font-bold text-red-600 mt-0.5">{remaining}K L.L due</p>
+                        <p className="text-sm text-gray-500">Total: {formatLira(order.total_price)}</p>
+                        {order.paid_amount > 0 && <p className="text-sm text-emerald-600">Paid: {formatLira(order.paid_amount)}</p>}
+                        <p className="text-xl font-bold text-red-600 mt-0.5">{formatLira(remaining)} due</p>
                       </div>
                     </div>
 
@@ -233,7 +234,7 @@ export default function DebtPage() {
                       {order.items?.map((item, i) => (
                         <div key={i} className="flex justify-between text-sm">
                           <span className="text-gray-600">{item.product_name} <span className="text-gray-400">× {item.quantity}</span></span>
-                          <span className="font-medium text-gray-800">{(item.price * item.quantity).toFixed(2)}K L.L</span>
+                          <span className="font-medium text-gray-800">{formatLira(Number((item.price * item.quantity).toFixed(2)))}</span>
                         </div>
                       ))}
                     </div>
@@ -252,19 +253,19 @@ export default function DebtPage() {
                           disabled={isProcessing}
                           className="py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                         >
-                          {isProcessing ? "Processing…" : `Pay Full (${remaining}K L.L)`}
+                          {isProcessing ? "Processing…" : `Pay Full (${formatLira(remaining)})`}
                         </button>
                         <div className="flex gap-2">
                           <div className="relative flex-1">
                             <input
-                              type="number" step="0.01" min="0.01" max={remaining}
+                              type="number" step="1" min="1" max={kToLira(remaining)}
                               value={paymentAmount[order.id] || ""}
                               onChange={e => setPaymentAmount({ ...paymentAmount, [order.id]: parseFloat(e.target.value) || 0 })}
                               placeholder="Partial amount"
                               disabled={isProcessing}
                               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all pr-14"
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">K L.L</span>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">L.L</span>
                           </div>
                           <button
                             onClick={() => handlePartialPayment(order.id, order.total_price)}

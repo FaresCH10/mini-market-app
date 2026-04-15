@@ -161,7 +161,7 @@ export default function Navbar() {
                   }`}
                 >
                   <IoWalletOutline size={15} />
-                  {balance.toLocaleString()} K L.L
+                  {balance.toLocaleString()} L.L
                 </button>
               )} */}
               <AuthButton />
@@ -290,7 +290,7 @@ export default function Navbar() {
                 }`}
               >
                 <IoWalletOutline size={18} />
-                <span>{balance.toLocaleString()} K L.L</span>
+                <span>{balance.toLocaleString()} L.L</span>
                 <span className={`ml-auto text-xs font-medium ${isWalletInDebt ? "text-red-500" : "text-emerald-500"}`}>Wallet</span>
               </button> */}
 

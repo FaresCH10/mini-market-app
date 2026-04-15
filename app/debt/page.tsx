@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { formatLira, kToLira, liraToK } from "@/lib/currency";
 
 type OrderItem = {
   id: string;
@@ -48,7 +49,7 @@ export default function DebtPage() {
 
     const defaults: Record<string, string> = {};
     for (const d of debtList) {
-      defaults[d.id] = String(d.total_price - (d.paid_amount ?? 0));
+      defaults[d.id] = String(kToLira(d.total_price - (d.paid_amount ?? 0)));
     }
     setPayAmounts(defaults);
     setLoading(false);
@@ -71,11 +72,11 @@ export default function DebtPage() {
   );
 
   const handlePay = async (debt: DebtOrder) => {
-    const amount = parseFloat(payAmounts[debt.id] ?? "0");
+    const amount = liraToK(parseFloat(payAmounts[debt.id] ?? "0"));
     const remaining = debt.total_price - (debt.paid_amount ?? 0);
 
     if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
-    if (amount > remaining) { toast.error(`Amount exceeds remaining debt (${remaining}K L.L)`); return; }
+    if (amount > remaining) { toast.error(`Amount exceeds remaining debt (${formatLira(remaining)})`); return; }
 
     setPaying(debt.id);
     try {
@@ -92,7 +93,7 @@ export default function DebtPage() {
         .eq("id", debt.id);
       if (error) throw error;
 
-      toast.success(isFullyPaid ? "Debt fully paid!" : `${amount}K L.L paid — debt updated`);
+      toast.success(isFullyPaid ? "Debt fully paid!" : `${formatLira(amount)} paid — debt updated`);
       await fetchData();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Payment failed");
@@ -125,7 +126,7 @@ export default function DebtPage() {
       {/* Summary */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
         <p className="text-xs text-gray-400 mb-1">Total Outstanding</p>
-        <p className="text-2xl font-bold text-orange-500">{totalRemaining}K L.L</p>
+        <p className="text-2xl font-bold text-orange-500">{formatLira(totalRemaining)}</p>
       </div>
 
       {debts.length === 0 ? (
@@ -146,7 +147,7 @@ export default function DebtPage() {
           {debts.map((debt) => {
             const remaining = debt.total_price - (debt.paid_amount ?? 0);
             const paidPct = debt.paid_amount ? (debt.paid_amount / debt.total_price) * 100 : 0;
-            const payAmount = parseFloat(payAmounts[debt.id] ?? "0");
+            const payAmount = liraToK(parseFloat(payAmounts[debt.id] ?? "0"));
             const canPay = payAmount > 0 && payAmount <= remaining;
 
             return (
@@ -175,8 +176,8 @@ export default function DebtPage() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-gray-900">{debt.total_price}K L.L</p>
-                    <p className="text-xs text-orange-500 font-semibold mt-0.5">{remaining}K L.L due</p>
+                    <p className="font-bold text-gray-900">{formatLira(debt.total_price)}</p>
+                    <p className="text-xs text-orange-500 font-semibold mt-0.5">{formatLira(remaining)} due</p>
                   </div>
                 </div>
 
@@ -186,7 +187,7 @@ export default function DebtPage() {
                     {debt.items?.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm text-gray-600">
                         <span>{item.product_name} × {item.quantity}</span>
-                        <span className="font-medium text-gray-800">{item.price * item.quantity}K L.L</span>
+                        <span className="font-medium text-gray-800">{formatLira(item.price * item.quantity)}</span>
                       </div>
                     ))}
                   </div>
@@ -196,8 +197,8 @@ export default function DebtPage() {
                 {debt.paid_amount > 0 && (
                   <div className="px-5 py-3 border-t border-orange-50">
                     <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                      <span>Paid: {debt.paid_amount}K L.L</span>
-                      <span>Remaining: {remaining}K L.L</span>
+                      <span>Paid: {formatLira(debt.paid_amount)}</span>
+                      <span>Remaining: {formatLira(remaining)}</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div
@@ -216,15 +217,15 @@ export default function DebtPage() {
                       <input
                         type="number"
                         min={1}
-                        max={remaining}
+                        max={kToLira(remaining)}
                         value={payAmounts[debt.id] ?? ""}
                         onChange={(e) =>
                           setPayAmounts((prev) => ({ ...prev, [debt.id]: e.target.value }))
                         }
-                        placeholder={`Max ${remaining}K`}
+                        placeholder={`Max ${kToLira(remaining).toLocaleString()}`}
                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent pr-14"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">K L.L</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">L.L</span>
                     </div>
                     <button
                       onClick={() => handlePay(debt)}

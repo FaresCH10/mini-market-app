@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { formatLira } from "@/lib/currency";
 
 type OrderItem = { product_name: string; quantity: number; price: number };
 type Order = { id: string; total_price: number; paid_amount: number; type: string; status: string; payment_status: string; created_at: string; user_id: string; user_name: string; user_email: string; items: OrderItem[] };
@@ -107,7 +108,7 @@ export default function OrdersPage() {
           { label: 'Total Orders', value: orders.length, color: 'text-gray-900' },
           { label: 'Paid', value: orders.filter(o => o.payment_status === 'paid').length, color: 'text-emerald-600' },
           { label: 'Pending / Partial', value: pendingCount, color: 'text-amber-600' },
-          { label: 'Revenue', value: `${totalRevenue}K L.L`, color: 'text-[#1B2D72]' },
+          { label: 'Revenue', value: formatLira(totalRevenue), color: 'text-[#1B2D72]' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">{s.label}</p>
@@ -161,9 +162,9 @@ export default function OrdersPage() {
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100 capitalize">{order.type}</span>
                   <span className="flex-1 text-sm text-gray-500 truncate">{order.user_name} <span className="text-gray-400">({order.user_email})</span></span>
-                  <span className="font-bold text-gray-900 text-sm">{order.total_price}K L.L</span>
+                  <span className="font-bold text-gray-900 text-sm">{formatLira(order.total_price)}</span>
                   {order.type === "dept" && order.payment_status !== "paid" && (
-                    <span className="text-xs text-red-500">Due: {remaining}K L.L</span>
+                    <span className="text-xs text-red-500">Due: {formatLira(remaining)}</span>
                   )}
                   <span className="text-xs text-gray-400 hidden sm:block">{new Date(order.created_at).toLocaleDateString()}</span>
                   <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,7 +179,7 @@ export default function OrdersPage() {
                       {order.items.length === 0 ? <p className="text-sm text-gray-400">No items found.</p> : order.items.map((item, i) => (
                         <div key={i} className="flex justify-between text-sm">
                           <span className="text-gray-700">{item.product_name} <span className="text-gray-400">× {item.quantity}</span></span>
-                          <span className="font-medium text-gray-900">{(item.price * item.quantity).toFixed(2)}K L.L</span>
+                          <span className="font-medium text-gray-900">{formatLira(Number((item.price * item.quantity).toFixed(2)))}</span>
                         </div>
                       ))}
                     </div>
@@ -187,7 +188,7 @@ export default function OrdersPage() {
                         <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
                           <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${Math.min((order.paid_amount / order.total_price) * 100, 100)}%` }} />
                         </div>
-                        <p className="text-xs text-gray-400">Paid {order.paid_amount}K of {order.total_price}K L.L ({((order.paid_amount / order.total_price) * 100).toFixed(0)}%)</p>
+                        <p className="text-xs text-gray-400">Paid {formatLira(order.paid_amount)} of {formatLira(order.total_price)} ({((order.paid_amount / order.total_price) * 100).toFixed(0)}%)</p>
                       </div>
                     )}
                   </div>

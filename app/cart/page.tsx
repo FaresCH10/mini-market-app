@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { formatLira, kToLira, liraToK } from "@/lib/currency";
 
 const MARKET_LOGO_PLACEHOLDER = "/favicon.ico";
 
@@ -24,10 +25,10 @@ export default function CartPage() {
 
   // Keep payNow in sync when total changes (e.g. items added/removed)
   useEffect(() => {
-    setPayNow(String(total));
+    setPayNow(String(kToLira(total)));
   }, [total]);
 
-  const payNowNum = Math.max(0, Math.min(parseFloat(payNow) || 0, total));
+  const payNowNum = Math.max(0, Math.min(liraToK(parseFloat(payNow) || 0), total));
   const debtAmount = total - payNowNum;
   const isFullPayment = debtAmount === 0;
   const isFullDebt = payNowNum === 0;
@@ -132,7 +133,7 @@ export default function CartPage() {
       } else if (isFullDebt) {
         toast.success("Order recorded as debt!");
       } else {
-        toast.success(`Paid ${payNowNum}K L.L now — ${debtAmount}K L.L recorded as debt`);
+        toast.success(`Paid ${formatLira(payNowNum)} now — ${formatLira(debtAmount)} recorded as debt`);
       }
 
       setTimeout(() => router.push("/profile"), 1500);
@@ -198,7 +199,7 @@ export default function CartPage() {
 
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
-                <p className="text-sm font-bold text-[#1B2D72]">{item.price}K L.L</p>
+                <p className="text-sm font-bold text-[#1B2D72]">{formatLira(item.price)}</p>
               </div>
 
               <div className="flex flex-col items-center gap-1">
@@ -220,7 +221,7 @@ export default function CartPage() {
               </div>
 
               <div className="text-right shrink-0">
-                <p className="font-bold text-gray-900">{item.price * item.quantity}K L.L</p>
+                <p className="font-bold text-gray-900">{formatLira(item.price * item.quantity)}</p>
                 <button
                   onClick={() => handleRemoveItem(item.product_id, item.name)}
                   className="text-xs text-red-400 hover:text-red-600 transition-colors mt-0.5"
@@ -239,11 +240,11 @@ export default function CartPage() {
             <div className="space-y-2 text-sm mb-5">
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal ({items.reduce((s, i) => s + i.quantity, 0)} items)</span>
-                <span className="font-medium text-gray-900">{total}K L.L</span>
+                <span className="font-medium text-gray-900">{formatLira(total)}</span>
               </div>
               <div className="flex justify-between font-bold text-base border-t border-gray-100 pt-3">
                 <span>Total</span>
-                <span>{total}K L.L</span>
+                <span>{formatLira(total)}</span>
               </div>
             </div>
 
@@ -258,17 +259,17 @@ export default function CartPage() {
                   <input
                     type="number"
                     min={0}
-                    max={total}
+                    max={kToLira(total)}
                     value={payNow}
                     onChange={(e) => setPayNow(e.target.value)}
                     onBlur={() => {
                       // Clamp on blur
                       const v = parseFloat(payNow) || 0;
-                      setPayNow(String(Math.max(0, Math.min(v, total))));
+                      setPayNow(String(Math.max(0, Math.min(v, kToLira(total)))));
                     }}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/30 focus:border-[#1B2D72] pr-14"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">K L.L</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">L.L</span>
                 </div>
                 {/* Quick-fill buttons */}
                 <div className="flex gap-1.5 mt-1.5">
@@ -277,11 +278,11 @@ export default function CartPage() {
                     className="flex-1 text-xs py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-orange-50 hover:text-orange-600 transition-colors font-medium"
                   >All debt</button>
                   <button
-                    onClick={() => setPayNow(String(Math.round(total / 2)))}
+                    onClick={() => setPayNow(String(Math.round(kToLira(total / 2))))}
                     className="flex-1 text-xs py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-[#1B2D72] transition-colors font-medium"
                   >Half</button>
                   <button
-                    onClick={() => setPayNow(String(total))}
+                    onClick={() => setPayNow(String(kToLira(total)))}
                     className="flex-1 text-xs py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-colors font-medium"
                   >Full</button>
                 </div>
@@ -295,7 +296,7 @@ export default function CartPage() {
                   {debtAmount > 0 ? "Goes to debt" : "No debt"}
                 </span>
                 <span className={`font-bold ${debtAmount > 0 ? "text-orange-600" : "text-emerald-600"}`}>
-                  {debtAmount}K L.L
+                  {formatLira(debtAmount)}
                 </span>
               </div>
             </div>
@@ -315,10 +316,10 @@ export default function CartPage() {
               {checkoutLoading
                 ? "Processing..."
                 : isFullPayment
-                  ? `Purchase — ${total}K L.L`
+                  ? `Purchase — ${formatLira(total)}`
                   : isFullDebt
-                    ? `Record as Debt — ${total}K L.L`
-                    : `Pay ${payNowNum}K now + ${debtAmount}K debt`}
+                    ? `Record as Debt — ${formatLira(total)}`
+                    : `Pay ${formatLira(payNowNum)} now + ${formatLira(debtAmount)} debt`}
             </button>
           </div>
         </div>

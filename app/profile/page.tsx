@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { formatLira } from '@/lib/currency'
 
 const ORDERS_PER_PAGE = 5
 
@@ -63,7 +64,7 @@ export default async function ProfilePage({
         <div className="text-right">
           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-100">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            Partial — {remaining}K L.L due
+            Partial — {formatLira(remaining)} due
           </span>
         </div>
       )
@@ -103,11 +104,11 @@ export default async function ProfilePage({
             <p className="text-xs text-gray-400 mt-0.5">Total Orders</p>
           </div>
           <div className="text-center border-x border-gray-100">
-            <p className="text-2xl font-bold text-emerald-600">{totalSpent}K</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatLira(totalSpent)}</p>
             <p className="text-xs text-gray-400 mt-0.5">Total Spent</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-orange-500">{pendingDebt}K</p>
+            <p className="text-2xl font-bold text-orange-500">{formatLira(pendingDebt)}</p>
             <p className="text-xs text-gray-400 mt-0.5">Pending Debt</p>
           </div>
         </div>
@@ -164,7 +165,7 @@ export default async function ProfilePage({
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-bold text-gray-900 mb-1">{order.total_price}K L.L</p>
+                      <p className="font-bold text-gray-900 mb-1">{formatLira(order.total_price)}</p>
                       {getStatusBadge(order)}
                     </div>
                   </div>
@@ -175,7 +176,7 @@ export default async function ProfilePage({
                       {order.items?.map((item: OrderItem) => (
                         <div key={item.id} className="flex justify-between text-sm text-gray-600">
                           <span>{item.product_name} × {item.quantity}</span>
-                          <span className="font-medium text-gray-800">{item.price * item.quantity}K L.L</span>
+                          <span className="font-medium text-gray-800">{formatLira(item.price * item.quantity)}</span>
                         </div>
                       ))}
                     </div>
@@ -185,8 +186,8 @@ export default async function ProfilePage({
                   {order.type === 'dept' && order.payment_status === 'partial' && (
                     <div className="px-5 py-3 border-t border-orange-50">
                       <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                        <span>Paid: {order.paid_amount ?? 0}K L.L</span>
-                        <span>Remaining: {order.total_price - (order.paid_amount ?? 0)}K L.L</span>
+                        <span>Paid: {formatLira(order.paid_amount ?? 0)}</span>
+                        <span>Remaining: {formatLira(order.total_price - (order.paid_amount ?? 0))}</span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1.5">
                         <div

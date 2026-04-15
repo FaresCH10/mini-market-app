@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
           role: "system",
           content:
             "You extract products from invoice images. Return ONLY a valid JSON array with this exact shape: " +
-            '[{"name":"Product Name","price":5,"quantity":2}]. ' +
-            "Rules: price must be in K L.L. If invoice price is in L.L, divide by 1000. If quantity is missing, use 1. " +
+            '[{"name":"Product Name","price":5000,"quantity":2}]. ' +
+            "Rules: price must be in full L.L amounts (normal thousands). If quantity is missing, use 1. " +
             "Ignore totals/subtotals/taxes/discount rows and non-product text.",
         },
         {

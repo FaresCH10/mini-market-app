@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { formatLira } from '@/lib/currency'
 
 type Stats = {
   products: number
@@ -104,7 +105,7 @@ export default function AdminDashboard() {
   const statCards = [
     {
       label: 'Total Revenue',
-      value: `${stats.revenue}K L.L`,
+      value: formatLira(stats.revenue),
       sub: 'sell price - base price on all paid orders',
       href: '/admin/orders',
       color: 'from-emerald-500 to-emerald-600',
@@ -116,7 +117,7 @@ export default function AdminDashboard() {
     },
     {
       label: 'Outstanding Debt',
-      value: `${stats.outstandingDebt}K L.L`,
+      value: formatLira(stats.outstandingDebt),
       sub: `${stats.pendingDebt} unpaid orders`,
       href: '/admin/debt',
       color: 'from-orange-500 to-orange-600',

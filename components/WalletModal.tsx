@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { useWallet } from "@/context/WalletContext";
+import { formatLira, liraToK } from "@/lib/currency";
 
 type WalletModalProps = {
   isOpen: boolean;
@@ -10,7 +11,7 @@ type WalletModalProps = {
   onBalanceUpdate: (newBalance: number) => void;
 };
 
-const QUICK_AMOUNTS = [50, 100, 500, 1000];
+const QUICK_AMOUNTS = [50000, 100000, 500000, 1000000];
 
 export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: WalletModalProps) {
   const [amount, setAmount] = useState("");
@@ -45,11 +46,12 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
   const isInDebt = currentAmount < 0;
 
   const addMoney = async () => {
-    const addAmount = parseFloat(amount);
-    if (!addAmount || addAmount <= 0) {
+    const addAmountLira = parseFloat(amount);
+    if (!addAmountLira || addAmountLira <= 0) {
       toast.error("Please enter a valid amount");
       return;
     }
+    const addAmount = liraToK(addAmountLira);
 
     setLoading(true);
     try {
@@ -110,7 +112,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
       setCurrentAmount(newBalance);
       await refreshBalance();
       onBalanceUpdate(newBalance);
-      toast.success(`${addAmount}K L.L added to wallet!`);
+      toast.success(`${formatLira(addAmount)} added to wallet!`);
       onClose();
     } catch (error) {
       console.error("Error adding money:", error);
@@ -132,7 +134,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-xs font-medium text-blue-200 uppercase tracking-wider mb-1">My Wallet</p>
-              <h2 className="text-2xl font-bold">{currentAmount.toLocaleString()}K L.L</h2>
+              <h2 className="text-2xl font-bold">{formatLira(currentAmount)}</h2>
               <p className="text-blue-200 text-sm mt-0.5">Current Balance</p>
             </div>
             <button
@@ -163,7 +165,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
                       : "bg-gray-50 text-gray-600 border-gray-100 hover:border-[#1B2D72] hover:text-[#1B2D72]"
                   }`}
                 >
-                  {q}K
+                  {q.toLocaleString()}
                 </button>
               ))}
             </div>
@@ -182,7 +184,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
                 autoFocus
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
-                K L.L
+                L.L
               </span>
             </div>
           </div>
@@ -199,7 +201,7 @@ export default function WalletModal({ isOpen, onClose, onBalanceUpdate }: Wallet
               disabled={loading || !amount || parseFloat(amount) <= 0}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-[#1B2D72] text-white hover:bg-[#00AECC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? "Adding..." : `Add ${amount ? `${amount}K` : ""} L.L`}
+              {loading ? "Adding..." : `Add ${amount ? `${Number(amount).toLocaleString()} ` : ""}L.L`}
             </button>
           </div>
         </div>

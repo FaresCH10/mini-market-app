@@ -26,11 +26,11 @@ Rules:
 - IGNORE category labels or section headers (short uppercase words like "SNAKZ", "DRINKZ", "CATEGORY", "ITEM", "PRICE" etc.)
 - IGNORE empty rows and purely numeric row numbers
 - Product names are descriptive text strings (may include weights, sizes, brand names, parentheses)
-- Prices are numbers — they may be formatted with commas (5,000) or have a currency suffix (20,000L.L or 20,000 L.L). Strip commas and currency text, then DIVIDE by 1000 to convert to K L.L (so 5000 → 5, 20000 → 20, 150000 → 150)
+- Prices are numbers — they may be formatted with commas (5,000) or have a currency suffix (20,000L.L or 20,000 L.L). Strip commas and currency text and keep full L.L values (so 5,000 → 5000, 20,000 → 20000)
 - The sheet may have multiple side-by-side product groups in the same row (e.g. columns A-C for one group, columns E-G for another) — extract ALL of them
 - If no quantity column is present, set quantity to 0
 - Return ONLY a valid JSON array with no explanation, no markdown, no code blocks:
-[{"name": "Product Name", "price": 5, "quantity": 0}, ...]`,
+[{"name": "Product Name", "price": 5000, "quantity": 0}, ...]`,
         },
         {
           role: "user",
