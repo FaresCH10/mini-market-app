@@ -226,10 +226,10 @@ export default function Home() {
                         {product.name}
                       </h2>
                       <p className="text-xl font-bold text-[#1B2D72] mb-0.5">
-                        {formatDollar(product.sell_price ?? Number((product.price * 1.2).toFixed(2)), exchangeRate)}
+                        {formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}
                       </p>
                       <p className="text-sm text-gray-400 mb-1">
-                        {formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}
+                        {formatDollar(product.sell_price ?? Number((product.price * 1.2).toFixed(2)), exchangeRate)}
                       </p>
                       {!isOutOfStock && (
                         <p className="text-xs text-gray-400 mb-3">

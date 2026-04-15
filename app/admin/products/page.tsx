@@ -120,6 +120,7 @@ export default function ManageProducts() {
   const [columnMap, setColumnMap] = useState<ColumnMap>({ name: '', price: '', quantity: '' })
   const [uploadingImage, setUploadingImage] = useState(false)
   const [searchingImage, setSearchingImage] = useState(false)
+  const [search, setSearch] = useState('')
   const [imagePickerUrls, setImagePickerUrls] = useState<string[]>([])
   const [bulkImagesRunning, setBulkImagesRunning] = useState(false)
   const [bulkImagesProgress, setBulkImagesProgress] = useState({ current: 0, total: 0 })
@@ -158,13 +159,13 @@ export default function ManageProducts() {
     finally { setLoading(false) }
   }
 
-  const handleUsdChange = (value: string) => {
-    const usd = parseFloat(value)
-    const ll = Number.isFinite(usd) && usd > 0 ? Math.round(usd * exchangeRate) : 0
+  const handleBaseLiraChange = (value: string) => {
+    const ll = parseFloat(value)
+    const usd = Number.isFinite(ll) && ll > 0 ? ll / exchangeRate : 0
     setFormData(prev => ({
       ...prev,
-      price_usd: value,
-      price: ll > 0 ? String(ll) : '',
+      price: value,
+      price_usd: usd > 0 ? usd.toFixed(2) : '',
       sell_price: ll > 0 ? String(Math.round(ll * 1.2)) : '',
     }))
   }
@@ -237,6 +238,7 @@ export default function ManageProducts() {
   }
 
   const handleEdit = (product: Product) => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setEditingProduct(product)
     setFormData({
       name: product.name,
@@ -532,6 +534,9 @@ export default function ManageProducts() {
   }
 
   if (!isAdmin) return null
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase().trim()),
+  )
   if (loading) return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {Array.from({ length: 6 }).map((_, i) => (
@@ -553,13 +558,35 @@ export default function ManageProducts() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Products</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {products.length} items in catalogue
+            {search.trim() ? `${filteredProducts.length} of ${products.length} items` : `${products.length} items in catalogue`}
             {bulkImagesRunning && bulkImagesProgress.total > 0 && (
               <span className="ml-2 text-[#1B2D72] font-medium">
                 · Auto-fill {bulkImagesProgress.current}/{bulkImagesProgress.total}
               </span>
             )}
           </p>
+          <div className="relative mt-3 w-full max-w-sm">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
+            />
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           {/* Exchange rate editor */}
@@ -906,20 +933,20 @@ export default function ManageProducts() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price ($) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (L.L) *</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   required
-                  value={formData.price_usd}
-                  onChange={e => handleUsdChange(e.target.value)}
+                  value={formData.price}
+                  onChange={e => handleBaseLiraChange(e.target.value)}
                   className={inputCls}
-                  placeholder="0.00"
+                  placeholder="0"
                 />
-                {formData.price && (
+                {formData.price_usd && (
                   <p className="mt-1 text-xs text-gray-400">
-                    ≈ {Number(formData.price).toLocaleString()} L.L
+                    ≈ ${Number(formData.price_usd).toFixed(2)}
                   </p>
                 )}
               </div>
@@ -1037,9 +1064,14 @@ export default function ManageProducts() {
           <p className="font-semibold text-gray-700">No products yet</p>
           <p className="text-sm text-gray-400 mt-1">Click "Add Product" to get started</p>
         </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+          <p className="font-semibold text-gray-700">No matching products</p>
+          <p className="text-sm text-gray-400 mt-1">Try a different product name.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div key={product.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
               <div className="h-44 bg-gray-50 relative overflow-hidden">
                 {product.image_url ? (
@@ -1055,8 +1087,8 @@ export default function ManageProducts() {
                 <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                 <div className="flex items-center justify-between mt-1 mb-3">
                   <div>
-                    <p className="text-lg font-bold text-[#1B2D72]">{formatDollar(product.sell_price ?? Number((product.price * 1.2).toFixed(2)), exchangeRate)}</p>
-                    <p className="text-xs text-gray-400">{formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}</p>
+                    <p className="text-lg font-bold text-[#1B2D72]">{formatLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))}</p>
+                    <p className="text-xs text-gray-400">{formatDollar(product.sell_price ?? Number((product.price * 1.2).toFixed(2)), exchangeRate)}</p>
                   </div>
                   <p className={`text-xs font-medium px-2 py-0.5 rounded-full ${product.quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                     {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}

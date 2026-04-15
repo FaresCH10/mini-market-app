@@ -20,6 +20,7 @@ type EditableRow = {
   id: string
   name: string
   price_usd: string
+  price_lira: string
   sell_price_lira: string
   quantity: string
   image_url: string
@@ -35,6 +36,7 @@ export default function ProductsEditPage() {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<EditableRow[]>([])
   const [initialRows, setInitialRows] = useState<Record<string, EditableRow>>({})
+  const [search, setSearch] = useState('')
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     if (typeof window === 'undefined') return DEFAULT_EXCHANGE_RATE
     return Number(localStorage.getItem(EXCHANGE_RATE_STORAGE_KEY)) || DEFAULT_EXCHANGE_RATE
@@ -59,6 +61,7 @@ export default function ProductsEditPage() {
       id: product.id,
       name: product.name,
       price_usd: (baseLira / rate).toFixed(2),
+      price_lira: String(baseLira),
       sell_price_lira: String(kToLira(product.sell_price ?? Number((product.price * 1.2).toFixed(2)))),
       quantity: String(product.quantity),
       image_url: product.image_url ?? '',
@@ -151,9 +154,9 @@ export default function ProductsEditPage() {
   }, [])
 
   const getBaseLira = (row: EditableRow) => {
-    const usd = parseFloat(row.price_usd)
-    if (!Number.isFinite(usd) || usd <= 0) return 0
-    return Math.round(usd * exchangeRate)
+    const lira = parseFloat(row.price_lira)
+    if (!Number.isFinite(lira) || lira <= 0) return 0
+    return lira
   }
 
   const updateRow = (id: string, updater: (row: EditableRow) => EditableRow) => {
@@ -167,7 +170,22 @@ export default function ProductsEditPage() {
       return {
         ...row,
         price_usd: value,
+        price_lira: baseLira > 0 ? String(baseLira) : '',
         sell_price_lira: baseLira > 0 ? String(Math.round(baseLira * 1.2)) : '',
+        dirty: true,
+      }
+    })
+  }
+
+  const handleLiraChange = (id: string, value: string) => {
+    updateRow(id, (row) => {
+      const lira = parseFloat(value)
+      const usd = Number.isFinite(lira) && lira > 0 ? (lira / exchangeRate).toFixed(2) : ''
+      return {
+        ...row,
+        price_lira: value,
+        price_usd: usd,
+        sell_price_lira: Number.isFinite(lira) && lira > 0 ? String(Math.round(lira * 1.2)) : '',
         dirty: true,
       }
     })
@@ -274,6 +292,9 @@ export default function ProductsEditPage() {
   }
 
   if (!isAdmin) return null
+  const filteredRows = rows.filter((row) =>
+    row.name.toLowerCase().includes(search.toLowerCase().trim()),
+  )
 
   return (
     <div>
@@ -281,8 +302,32 @@ export default function ProductsEditPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Edit Products Table</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Inline editing for all products with automatic USD/L.L calculations
+            {search.trim()
+              ? `${filteredRows.length} of ${rows.length} products`
+              : 'Inline editing for all products with automatic USD/L.L calculations'}
           </p>
+          <div className="relative mt-3 w-full max-w-sm">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 py-2 bg-white text-sm">
@@ -315,6 +360,11 @@ export default function ProductsEditPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <p className="font-semibold text-gray-700">No products found</p>
         </div>
+      ) : filteredRows.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+          <p className="font-semibold text-gray-700">No matching products</p>
+          <p className="text-sm text-gray-400 mt-1">Try a different product name.</p>
+        </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm">
@@ -330,7 +380,7 @@ export default function ProductsEditPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => {
+              {filteredRows.map((row) => {
                 const baseLira = getBaseLira(row)
                 return (
                   <tr key={row.id} className={row.dirty ? 'bg-amber-50/30' : ''}>
@@ -353,7 +403,15 @@ export default function ProductsEditPage() {
                       />
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="font-medium text-gray-700">{formatLira(liraToK(baseLira))}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={row.price_lira}
+                        onChange={(e) => handleLiraChange(row.id, e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">{formatLira(liraToK(baseLira || 0))}</p>
                     </td>
                     <td className="px-3 py-2.5">
                       <input
