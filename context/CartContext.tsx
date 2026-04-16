@@ -26,6 +26,7 @@ type CartContextType = {
   loading: boolean;
   refreshCart: () => Promise<void>;
   userId: string | null;
+  authChecked: boolean;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -250,6 +251,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         loading,
         refreshCart,
         userId,
+        authChecked,
       }}
     >
       {children}
