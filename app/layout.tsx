@@ -9,7 +9,7 @@ import { CartProvider } from "@/context/CartContext";
 
 export const metadata = {
   title: "NavyBits Market",
-  description: "Description here",
+  description: "NavyBits Market - Mini Market",
   metadataBase: new URL("https://yourdomain.com"),
 };
 

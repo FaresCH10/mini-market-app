@@ -34,6 +34,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
@@ -44,11 +45,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         data: { user },
       } = await supabase.auth.getUser();
       setUserId(user?.id || null);
+      setAuthChecked(true);
     };
     getUser();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setUserId(session?.user?.id || null);
         if (!session?.user) {
           setItems([]);
@@ -61,15 +63,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
-  // Fetch cart from database when user changes
+  // Fetch cart from database when user changes (wait until auth is resolved)
   useEffect(() => {
+    if (!authChecked) return;
     if (userId) {
       fetchCart(true);
     } else {
       setItems([]);
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, authChecked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCart = async (showLoading = false) => {
     if (!userId) return;
