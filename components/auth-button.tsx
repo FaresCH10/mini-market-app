@@ -21,7 +21,9 @@ export default function AuthButton() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
-      router.refresh()
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        router.refresh()
+      }
     })
 
     return () => { listener.subscription.unsubscribe() }
