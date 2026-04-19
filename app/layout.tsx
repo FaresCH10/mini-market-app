@@ -6,6 +6,7 @@ import ChatWidgetLoader from "@/components/ChatWidgetLoader";
 import { Inter } from "next/font/google";
 // import { WalletProvider } from "@/context/WalletContext";
 import { CartProvider } from "@/context/CartContext";
+import ApprovalGuard from "@/components/ApprovalGuard";
 
 export const metadata = {
   title: "NavyBits Market",
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className="font-sans">
         {/* <WalletProvider> */}
           <CartProvider>
+            <ApprovalGuard />
             <Suspense fallback={<div className="bg-gray-800 h-16" />}>
               <Navbar />
             </Suspense>

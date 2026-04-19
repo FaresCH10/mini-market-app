@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 
-type Profile = { id: string; email: string; name: string; role: string; created_at: string }
+type Profile = { id: string; email: string; name: string; role: string; approved: boolean; created_at: string }
 
 export default function ManageUsers() {
   const [users, setUsers] = useState<Profile[]>([])
@@ -31,7 +31,11 @@ export default function ManageUsers() {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('approved', { ascending: true })      // pending first
+        .order('created_at', { ascending: false })
       if (error) throw error
       setUsers(data || [])
     } catch { toast.error('Failed to load users') }
@@ -50,6 +54,17 @@ export default function ManageUsers() {
     finally { setUpdatingId(null) }
   }
 
+  const setApproval = async (userId: string, approve: boolean) => {
+    setUpdatingId(userId)
+    try {
+      const { error } = await supabase.from('profiles').update({ approved: approve }).eq('id', userId)
+      if (error) throw error
+      toast.success(approve ? 'User approved' : 'Approval revoked')
+      fetchUsers()
+    } catch { toast.error('Failed to update approval') }
+    finally { setUpdatingId(null) }
+  }
+
   const filtered = users.filter(u =>
     !search.trim() ||
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -63,7 +78,14 @@ export default function ManageUsers() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{users.length} registered accounts</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {users.length} registered accounts
+            {users.filter(u => !u.approved).length > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-medium">
+                · {users.filter(u => !u.approved).length} pending approval
+              </span>
+            )}
+          </p>
         </div>
         <button onClick={fetchUsers} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,11 +128,13 @@ export default function ManageUsers() {
               {filtered.map((user) => {
                 const initials = (user.name || user.email || 'U').slice(0, 2).toUpperCase()
                 const isUpdating = updatingId === user.id
+                const isPending = !user.approved
+
                 return (
-                  <div key={user.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/50 transition-colors">
+                  <div key={user.id} className={`flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors ${isPending ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-gray-50/50'}`}>
                     {/* Avatar */}
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                      user.role === 'admin' ? 'bg-[#1B2D72] text-white' : 'bg-gray-100 text-gray-600'
+                      user.role === 'admin' ? 'bg-[#1B2D72] text-white' : isPending ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
                     }`}>
                       {initials}
                     </div>
@@ -121,8 +145,15 @@ export default function ManageUsers() {
                       <p className="text-xs text-gray-400 truncate">{user.email}</p>
                     </div>
 
+                    {/* Pending badge */}
+                    {isPending && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
+                        Pending
+                      </span>
+                    )}
+
                     {/* Role badge */}
-                    <span className={`hidden sm:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${
+                    <span className={`hidden sm:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
                       user.role === 'admin' ? 'bg-[#1B2D72]/10 text-[#1B2D72]' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {user.role || 'user'}
@@ -133,7 +164,26 @@ export default function ManageUsers() {
                       {new Date(user.created_at).toLocaleDateString()}
                     </p>
 
-                    {/* Action */}
+                    {/* Approve / Revoke */}
+                    {isPending ? (
+                      <button
+                        onClick={() => setApproval(user.id, true)}
+                        disabled={isUpdating}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors disabled:opacity-50 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                      >
+                        {isUpdating ? '…' : 'Approve'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setApproval(user.id, false)}
+                        disabled={isUpdating}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors disabled:opacity-50 bg-red-50 text-red-600 border border-red-100 hover:bg-red-100"
+                      >
+                        {isUpdating ? '…' : 'Revoke'}
+                      </button>
+                    )}
+
+                    {/* Make/Remove Admin */}
                     <button
                       onClick={() => toggleAdminRole(user.id, user.role)}
                       disabled={isUpdating}

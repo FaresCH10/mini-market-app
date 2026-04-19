@@ -121,7 +121,7 @@ export default function ChatWidget() {
 
   const router = useRouter();
   // const { refreshBalance } = useWallet();
-  const { refreshCart } = useCart();
+  const { refreshCart, isApproved } = useCart();
 
   const sendMessage = useCallback(
     async (text?: string) => {
@@ -380,6 +380,32 @@ export default function ChatWidget() {
               </div>
             )}
 
+            {/* Account pending approval */}
+            {authChecked && userId && isApproved === false && (
+              <div style={{
+                margin: "auto", textAlign: "center",
+                padding: "28px 20px",
+              }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: "50%", margin: "0 auto 14px",
+                  background: "#fef3c7",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#d97706",
+                }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#111827", fontSize: 15 }}>
+                  Account pending approval
+                </p>
+                <p style={{ margin: 0, color: "#6b7280", fontSize: 13, lineHeight: 1.5 }}>
+                  The assistant will be available<br />once an admin approves your account.
+                </p>
+              </div>
+            )}
+
             {/* Messages */}
             {messages.map((m, i) => (
               <div
@@ -460,7 +486,7 @@ export default function ChatWidget() {
           </div>
 
           {/* ── Quick chips ── */}
-          {userId && messages.length <= 1 && !loading && (
+          {userId && isApproved !== false && messages.length <= 1 && !loading && (
             <div style={{
               padding: "10px 14px 6px",
               display: "flex", flexWrap: "wrap", gap: 6,
@@ -506,18 +532,19 @@ export default function ChatWidget() {
               onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && sendMessage()}
               placeholder={
                 !userId ? "Log in to chat..." :
+                isApproved === false ? "Account pending approval..." :
                 isAdmin ? "Manage products, orders, debts..." :
                 "Ask about products, orders, wallet..."
               }
-              disabled={loading || !userId}
+              disabled={loading || !userId || isApproved === false}
               style={{
                 flex: 1, padding: "10px 16px",
                 borderRadius: 14, fontSize: 13.5,
                 border: "1.5px solid #e5e7eb",
-                background: !userId ? "#f9fafb" : "#fff",
+                background: !userId || isApproved === false ? "#f9fafb" : "#fff",
                 color: "#1f2937",
                 transition: "border-color 0.15s, box-shadow 0.15s",
-                opacity: !userId ? 0.6 : 1,
+                opacity: !userId || isApproved === false ? 0.6 : 1,
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = primary;
@@ -531,19 +558,19 @@ export default function ChatWidget() {
             <button
               className="cw-send"
               onClick={() => sendMessage()}
-              disabled={loading || !input.trim() || !userId}
+              disabled={loading || !input.trim() || !userId || isApproved === false}
               style={{
                 width: 42, height: 42, flexShrink: 0,
                 borderRadius: 13,
-                background: loading || !input.trim() || !userId
+                background: loading || !input.trim() || !userId || isApproved === false
                   ? "#e5e7eb"
                   : `linear-gradient(135deg, ${primary}, ${primaryMid})`,
-                color: loading || !input.trim() || !userId ? "#9ca3af" : "#fff",
+                color: loading || !input.trim() || !userId || isApproved === false ? "#9ca3af" : "#fff",
                 border: "none",
-                cursor: loading || !input.trim() || !userId ? "not-allowed" : "pointer",
+                cursor: loading || !input.trim() || !userId || isApproved === false ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "all 0.15s",
-                boxShadow: loading || !input.trim() || !userId ? "none" : `0 2px 10px ${primary}40`,
+                boxShadow: loading || !input.trim() || !userId || isApproved === false ? "none" : `0 2px 10px ${primary}40`,
               }}
             >
               <SendIcon />

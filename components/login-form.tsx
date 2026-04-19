@@ -27,8 +27,17 @@ export function LoginForm({
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+
+      // Ensure profile exists and check approval status
+      const res = await fetch("/api/auth/create-profile", { method: "POST" });
+      const body = await res.json() as { approved?: boolean };
+
       router.refresh();
-      router.push("/");
+      if (body.approved === false) {
+        router.push("/pending-approval");
+      } else {
+        router.push("/");
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {

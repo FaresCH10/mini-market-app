@@ -27,6 +27,7 @@ type CartContextType = {
   refreshCart: () => Promise<void>;
   userId: string | null;
   authChecked: boolean;
+  isApproved: boolean | null;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -36,6 +37,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const supabase = createClient();
   const router = useRouter();
 
@@ -55,6 +57,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setUserId(session?.user?.id || null);
         if (!session?.user) {
           setItems([]);
+          setIsApproved(null);
         }
       },
     );
@@ -64,14 +67,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
-  // Fetch cart from database when user changes (wait until auth is resolved)
+  // Fetch cart and approval status when user changes (wait until auth is resolved)
   useEffect(() => {
     if (!authChecked) return;
     if (userId) {
       fetchCart(true);
+      supabase
+        .from("profiles")
+        .select("approved")
+        .eq("id", userId)
+        .single()
+        .then(({ data }) => setIsApproved(data?.approved ?? null));
     } else {
       setItems([]);
       setLoading(false);
+      setIsApproved(null);
     }
   }, [userId, authChecked]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -132,6 +142,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!userId) {
       toast.error("Please login first");
       router.push('/auth/login');
+      return;
+    }
+
+    if (isApproved === false) {
+      toast.error("Your account is pending admin approval");
       return;
     }
 
@@ -252,6 +267,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         refreshCart,
         userId,
         authChecked,
+        isApproved,
       }}
     >
       {children}
