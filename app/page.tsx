@@ -15,6 +15,7 @@ type Product = {
   image_url?: string | null;
 };
 const MARKET_LOGO_PLACEHOLDER = "/favicon.ico";
+const MOBILE_COLUMNS_STORAGE_KEY = "mm_products_mobile_columns";
 
 function safeImg(url: string | null | undefined): string {
   if (!url || !url.trim()) return MARKET_LOGO_PLACEHOLDER;
@@ -27,10 +28,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [mobileColumns, setMobileColumns] = useState<1 | 2>(() => {
-    if (typeof window === "undefined") return 1;
-    return localStorage.getItem("mm_products_mobile_columns") === "2" ? 2 : 1;
-  });
+  const [mobileColumns, setMobileColumns] = useState<1 | 2>(1);
   const [exchangeRate] = useState<number>(() => {
     if (typeof window === "undefined") return 90_000;
     return Number(localStorage.getItem("mm_exchange_rate")) || 90_000;
@@ -43,8 +41,17 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("mm_products_mobile_columns", String(mobileColumns));
-  }, [mobileColumns]);
+    const saved = localStorage.getItem(MOBILE_COLUMNS_STORAGE_KEY);
+    setMobileColumns(saved === "2" ? 2 : 1);
+  }, []);
+
+  const toggleMobileColumns = () => {
+    setMobileColumns((prev) => {
+      const next = prev === 1 ? 2 : 1;
+      localStorage.setItem(MOBILE_COLUMNS_STORAGE_KEY, String(next));
+      return next;
+    });
+  };
 
   const fetchProducts = async () => {
     try {
@@ -139,10 +146,10 @@ export default function Home() {
           </div>
           <button
             type="button"
-            onClick={() => setMobileColumns((prev) => (prev === 1 ? 2 : 1))}
+            onClick={toggleMobileColumns}
             aria-pressed={mobileColumns === 2}
             className="sm:hidden shrink-0 h-10 px-2.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-            aria-label={`Toggle mobile layout (${mobileColumns === 2 ? "2 columns" : "1 column"})`}
+            aria-label={`Toggle mobile layout (currently ${mobileColumns} column${mobileColumns === 1 ? "" : "s"})`}
           >
             <span className="text-[11px] text-gray-500">1</span>
             <span className={`relative w-8 h-4 rounded-full transition-colors ${mobileColumns === 2 ? "bg-[#1B2D72]" : "bg-gray-300"}`}>
