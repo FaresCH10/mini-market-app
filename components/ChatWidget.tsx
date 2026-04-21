@@ -204,7 +204,19 @@ export default function ChatWidget() {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .cw-panel { animation: cw-slide-up 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+        .cw-panel {
+          animation: cw-slide-up 0.25s cubic-bezier(0.34,1.56,0.64,1);
+          width: 380px;
+          height: 560px;
+        }
+        @media (max-width: 440px) {
+          .cw-panel {
+            width: calc(100vw - 32px) !important;
+            height: calc(100dvh - 130px) !important;
+            right: 16px !important;
+            bottom: 88px !important;
+          }
+        }
         .cw-msg   { animation: cw-msg-in 0.2s ease; }
         .cw-input:focus { outline: none; }
         .cw-btn-fab:hover { transform: scale(1.08) !important; }
@@ -277,7 +289,6 @@ export default function ChatWidget() {
           className="cw-panel"
           style={{
             position: "fixed", bottom: 96, right: 24, zIndex: 9998,
-            width: 380, height: 560,
             background: "#fff", borderRadius: 24,
             boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
             display: "flex", flexDirection: "column", overflow: "hidden",

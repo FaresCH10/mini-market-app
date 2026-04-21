@@ -7,11 +7,19 @@ import { Inter } from "next/font/google";
 // import { WalletProvider } from "@/context/WalletContext";
 import { CartProvider } from "@/context/CartContext";
 import ApprovalGuard from "@/components/ApprovalGuard";
+import type { Viewport } from "next";
 
 export const metadata = {
   title: "NavyBits Market",
   description: "NavyBits Market - Mini Market",
   metadataBase: new URL("https://yourdomain.com"),
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });

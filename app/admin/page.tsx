@@ -12,6 +12,8 @@ type Stats = {
   pendingDebt: number
   revenue: number
   outstandingDebt: number
+  todayRevenue: number
+  todayPaid: number
 }
 
 export default function AdminDashboard() {
@@ -19,6 +21,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>({
     products: 0, users: 0, totalOrders: 0,
     pendingDebt: 0, revenue: 0, outstandingDebt: 0,
+    todayRevenue: 0, todayPaid: 0,
   })
   const router = useRouter()
   const supabase = createClient()
@@ -41,6 +44,7 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       const [
+        todayYieldBody,
         { count: productsCount },
         { count: usersCount },
         { count: totalOrders },
@@ -48,6 +52,7 @@ export default function AdminDashboard() {
         { data: paidOrders },
         { data: debtOrders },
       ] = await Promise.all([
+        fetch('/api/admin/today-yield').then(r => r.json()).catch(() => ({ users: [] })),
         supabase.from('products').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('orders').select('*', { count: 'exact', head: true }),
@@ -59,6 +64,9 @@ export default function AdminDashboard() {
         supabase.from('orders').select('total_price, paid_amount')
           .eq('type', 'dept').neq('payment_status', 'paid'),
       ])
+      const todayUsers = ((todayYieldBody as { users?: Array<{ total_spent: number; total_paid: number }> })?.users ?? [])
+      const todayRevenue = todayUsers.reduce((s, u) => s + u.total_spent, 0)
+      const todayPaid = todayUsers.reduce((s, u) => s + u.total_paid, 0)
 
       const paidOrderIds = (paidOrders ?? []).map((o) => o.id)
       let revenue = 0
@@ -76,10 +84,8 @@ export default function AdminDashboard() {
         const byId = new Map((productRows ?? []).map((p) => [p.id as string, p]))
         revenue = (items ?? []).reduce((sum, item) => {
           const product = byId.get(item.product_id)
-          const sellPrice = Number(product?.sell_price ?? item.price ?? product?.price ?? 0)
-          const basePrice = product
-            ? Number(product.price ?? 0)
-            : Number((sellPrice / 1.2).toFixed(2))
+          const sellPrice = Number(item.price ?? 0)
+          const basePrice = Number(product?.price ?? 0)
           const qty = Number(item.quantity ?? 0)
           return sum + Math.max(0, sellPrice - basePrice) * qty
         }, 0)
@@ -94,6 +100,8 @@ export default function AdminDashboard() {
         pendingDebt: pendingDebt ?? 0,
         revenue,
         outstandingDebt,
+        todayRevenue,
+        todayPaid,
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
@@ -103,6 +111,18 @@ export default function AdminDashboard() {
   if (!isAdmin) return null
 
   const statCards = [
+    {
+      label: "Today's Yield",
+      value: formatLira(stats.todayRevenue),
+      sub: `${formatLira(stats.todayPaid)} collected today`,
+      href: '/admin/today-yield',
+      color: 'from-teal-500 to-teal-600',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      ),
+    },
     {
       label: 'Total Revenue',
       value: formatLira(stats.revenue),

@@ -21,6 +21,7 @@ const EXCHANGE_RATE_STORAGE_KEY = 'mm_exchange_rate'
 export default function ManageProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState({ name: '', price_usd: '', price: '', sell_price: '', quantity: '', image_url: '' })
@@ -172,14 +173,15 @@ export default function ManageProducts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const basePriceLira = parseFloat(formData.price_usd) * exchangeRate
+    if (isSubmitting) return
+    const basePriceLira = parseFloat(formData.price)
     const basePrice = liraToK(basePriceLira)
     const quantity = parseInt(formData.quantity, 10)
     const parsedSellPriceLira = parseFloat(formData.sell_price)
     const parsedSellPrice = liraToK(parsedSellPriceLira)
 
     if (!Number.isFinite(basePriceLira) || basePriceLira < 0) {
-      toast.error('Please enter a valid base price')
+      toast.error('Please enter a valid base price (L.L)')
       return
     }
     if (!Number.isFinite(quantity) || quantity < 0) {
@@ -202,6 +204,7 @@ export default function ManageProducts() {
       quantity,
       image_url: formData.image_url || null,
     }
+    setIsSubmitting(true)
     try {
       if (editingProduct) {
         const { error } = await supabase.from('products').update(productData).eq('id', editingProduct.id)
@@ -224,6 +227,8 @@ export default function ManageProducts() {
           ? (error as { message: string }).message
           : 'Failed to save product'
       toast.error(message)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1042,8 +1047,14 @@ export default function ManageProducts() {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors">
-                {editingProduct ? 'Update Product' : 'Add Product'}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-xl bg-[#1B2D72] text-white text-sm font-semibold hover:bg-[#00AECC] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSubmitting
+                  ? (editingProduct ? 'Updating...' : 'Adding...')
+                  : (editingProduct ? 'Update Product' : 'Add Product')}
               </button>
               <button type="button" onClick={() => { setShowForm(false); setEditingProduct(null); setFormData({ name: '', price_usd: '', price: '', sell_price: '', quantity: '', image_url: '' }); setImagePickerUrls([]) }} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
