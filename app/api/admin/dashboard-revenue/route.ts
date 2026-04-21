@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabase } from "@/lib/supabase/server";
 import { createClient as createServiceSupabase } from "@supabase/supabase-js";
 
@@ -102,7 +102,7 @@ const getBusinessDayStartMs = (now: Date): number => {
   );
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const authClient = await createServerSupabase();
     const {
@@ -129,28 +129,39 @@ export async function GET() {
 
     const adminClient = createServiceSupabase(supabaseUrl, serviceRoleKey);
 
+    const range = req.nextUrl.searchParams.get("range") ?? "day";
+    const includeAllTime = range === "all";
+
     const now = new Date();
     const nowMs = now.getTime();
     const businessDayStartMs = getBusinessDayStartMs(now);
     const windowStartIso = new Date(businessDayStartMs).toISOString();
     const nowIso = now.toISOString();
 
-    const { data: paidOrders, error: paidOrdersError } = await adminClient
+    let paidOrdersQuery = adminClient
       .from("orders")
       .select("id, created_at")
       .eq("payment_status", "paid")
-      .gte("created_at", windowStartIso)
-      .lte("created_at", nowIso)
       .order("created_at", { ascending: false });
+
+    if (!includeAllTime) {
+      paidOrdersQuery = paidOrdersQuery
+        .gte("created_at", windowStartIso)
+        .lte("created_at", nowIso);
+    }
+
+    const { data: paidOrders, error: paidOrdersError } = await paidOrdersQuery;
 
     if (paidOrdersError) {
       return NextResponse.json({ error: paidOrdersError.message }, { status: 500 });
     }
 
-    const paidOrdersInWindow = ((paidOrders ?? []) as PaidOrderRow[]).filter((order) => {
-      const createdAtMs = new Date(order.created_at).getTime();
-      return Number.isFinite(createdAtMs) && createdAtMs >= businessDayStartMs && createdAtMs <= nowMs;
-    });
+    const paidOrdersInWindow = includeAllTime
+      ? ((paidOrders ?? []) as PaidOrderRow[])
+      : ((paidOrders ?? []) as PaidOrderRow[]).filter((order) => {
+          const createdAtMs = new Date(order.created_at).getTime();
+          return Number.isFinite(createdAtMs) && createdAtMs >= businessDayStartMs && createdAtMs <= nowMs;
+        });
     const paidOrderIds = paidOrdersInWindow.map((order) => order.id);
 
     if (paidOrderIds.length === 0) {

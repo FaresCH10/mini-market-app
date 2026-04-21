@@ -167,6 +167,7 @@ export default function AdminDashboard() {
     { href: '/admin/debt', label: 'Collect Payments', desc: 'Process outstanding debts', color: 'bg-orange-50 border-orange-100 text-orange-700 hover:bg-orange-100' },
     // { href: '/admin/wallets', label: 'Manage Wallets', desc: 'Adjust user balances', color: 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100' },
     { href: '/admin/orders', label: 'View Orders', desc: 'Browse all order history', color: 'bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100' },
+    { href: '/admin/revenue-history', label: 'Revenue History', desc: 'See daily revenue by date', color: 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100' },
   ]
 
   return (

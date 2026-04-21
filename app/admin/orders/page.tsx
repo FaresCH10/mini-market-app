@@ -18,6 +18,7 @@ export default function OrdersPage() {
   const PAGE_SIZE = 20;
   const [orders, setOrders] = useState<Order[]>([]);
   const [filtered, setFiltered] = useState<Order[]>([]);
+  const [totalRevenueAllTime, setTotalRevenueAllTime] = useState(0);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
@@ -46,10 +47,19 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/orders-data?mode=all");
-      const body = await res.json() as { orders?: Order[]; error?: string };
-      if (!res.ok) throw new Error(body.error ?? "Failed to load orders");
-      setOrders(body.orders ?? []);
+      const [ordersRes, revenueRes] = await Promise.all([
+        fetch("/api/admin/orders-data?mode=all"),
+        fetch("/api/admin/dashboard-revenue?range=all"),
+      ]);
+
+      const ordersBody = await ordersRes.json() as { orders?: Order[]; error?: string };
+      const revenueBody = await revenueRes.json() as { revenue?: number; error?: string };
+
+      if (!ordersRes.ok) throw new Error(ordersBody.error ?? "Failed to load orders");
+      if (!revenueRes.ok) throw new Error(revenueBody.error ?? "Failed to load total revenue");
+
+      setOrders(ordersBody.orders ?? []);
+      setTotalRevenueAllTime(Number(revenueBody.revenue ?? 0));
     } catch { toast.error("Failed to load orders"); }
     finally { setLoading(false); }
   };
@@ -102,7 +112,7 @@ export default function OrdersPage() {
   if (loading) return (
     <div>
       <div className="mb-6"><div className="h-7 bg-gray-100 rounded w-32 animate-pulse" /></div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse"><div className="h-3 bg-gray-100 rounded w-2/3 mb-2" /><div className="h-7 bg-gray-100 rounded w-1/2" /></div>)}</div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse"><div className="h-3 bg-gray-100 rounded w-2/3 mb-2" /><div className="h-7 bg-gray-100 rounded w-1/2" /></div>)}</div>
       <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 h-16 animate-pulse" />)}</div>
     </div>
   );
@@ -121,11 +131,12 @@ export default function OrdersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {[
           { label: 'Total Orders', value: orders.length, color: 'text-gray-900' },
           { label: 'Paid', value: orders.filter(o => o.payment_status === 'paid').length, color: 'text-emerald-600' },
           { label: 'Pending / Partial', value: pendingCount, color: 'text-amber-600' },
+          { label: 'Total Revenue (All Time)', value: formatLira(totalRevenueAllTime), color: 'text-violet-600' },
           { label: 'Earnings', value: formatLira(totalRevenue), color: 'text-[#1B2D72]' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
