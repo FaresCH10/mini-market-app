@@ -45,22 +45,20 @@ export default function AdminDashboard() {
     try {
       const [
         todayYieldBody,
+        revenueBody,
         { count: productsCount },
         { count: usersCount },
         { count: totalOrders },
         { count: pendingDebt },
-        { data: paidOrders },
         { data: debtOrders },
       ] = await Promise.all([
         fetch('/api/admin/today-yield').then(r => r.json()).catch(() => ({ users: [] })),
+        fetch('/api/admin/dashboard-revenue').then(r => r.json()).catch(() => ({ revenue: 0 })),
         supabase.from('products').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('orders').select('*', { count: 'exact', head: true }),
         supabase.from('orders').select('*', { count: 'exact', head: true })
           .eq('type', 'dept').neq('payment_status', 'paid'),
-        supabase.from('orders').select('id, total_price')
-          .eq('payment_status', 'paid')
-          .order('created_at', { ascending: false }),
         supabase.from('orders').select('total_price, paid_amount')
           .eq('type', 'dept').neq('payment_status', 'paid'),
       ])
@@ -68,28 +66,7 @@ export default function AdminDashboard() {
       const todayRevenue = todayUsers.reduce((s, u) => s + u.total_spent, 0)
       const todayPaid = todayUsers.reduce((s, u) => s + u.total_paid, 0)
 
-      const paidOrderIds = (paidOrders ?? []).map((o) => o.id)
-      let revenue = 0
-      if (paidOrderIds.length > 0) {
-        const { data: items } = await supabase
-          .from('order_items')
-          .select('product_id, quantity, price')
-          .in('order_id', paidOrderIds)
-
-        const productIds = [...new Set((items ?? []).map((it) => it.product_id).filter(Boolean))]
-        const { data: productRows } = productIds.length > 0
-          ? await supabase.from('products').select('id, price, sell_price').in('id', productIds)
-          : { data: [] as { id: string; price: number; sell_price: number | null }[] }
-
-        const byId = new Map((productRows ?? []).map((p) => [p.id as string, p]))
-        revenue = (items ?? []).reduce((sum, item) => {
-          const product = byId.get(item.product_id)
-          const sellPrice = Number(item.price ?? 0)
-          const basePrice = Number(product?.price ?? 0)
-          const qty = Number(item.quantity ?? 0)
-          return sum + Math.max(0, sellPrice - basePrice) * qty
-        }, 0)
-      }
+      const revenue = Number((revenueBody as { revenue?: unknown })?.revenue ?? 0)
       const outstandingDebt = debtOrders?.reduce(
         (s, o) => s + (o.total_price - (o.paid_amount ?? 0)), 0
       ) ?? 0
@@ -126,7 +103,7 @@ export default function AdminDashboard() {
     {
       label: 'Total Revenue',
       value: formatLira(stats.revenue),
-      sub: 'sell price - base price on all paid orders',
+      sub: 'sell price - base price from 1:00 AM (Beirut)',
       href: '/admin/orders',
       color: 'from-emerald-500 to-emerald-600',
       icon: (

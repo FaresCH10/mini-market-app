@@ -126,7 +126,7 @@ export default function OrdersPage() {
           { label: 'Total Orders', value: orders.length, color: 'text-gray-900' },
           { label: 'Paid', value: orders.filter(o => o.payment_status === 'paid').length, color: 'text-emerald-600' },
           { label: 'Pending / Partial', value: pendingCount, color: 'text-amber-600' },
-          { label: 'Revenue', value: formatLira(totalRevenue), color: 'text-[#1B2D72]' },
+          { label: 'Earnings', value: formatLira(totalRevenue), color: 'text-[#1B2D72]' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">{s.label}</p>
