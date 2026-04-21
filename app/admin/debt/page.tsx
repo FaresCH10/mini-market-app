@@ -10,6 +10,8 @@ type DebtOrder = { id: string; total_price: number; paid_amount: number; payment
 export default function DebtPage() {
   const [orders, setOrders] = useState<DebtOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<{ [key: string]: number }>({});
@@ -130,7 +132,14 @@ export default function DebtPage() {
   };
 
   const getRemaining = (order: DebtOrder) => order.total_price - (order.paid_amount || 0);
-  const totalOutstanding = orders.reduce((s, o) => s + getRemaining(o), 0);
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch = !search.trim()
+      || order.user_name.toLowerCase().includes(search.toLowerCase().trim());
+    const matchesDate = !dateFilter || order.created_at.slice(0, 10) === dateFilter;
+    return matchesSearch && matchesDate;
+  });
+  const hasFilters = Boolean(search.trim() || dateFilter);
+  const totalOutstanding = filteredOrders.reduce((s, o) => s + getRemaining(o), 0);
 
   if (loading) return (
     <div>
@@ -145,7 +154,9 @@ export default function DebtPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Debt Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{orders.length} unpaid orders</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {filteredOrders.length} of {orders.length} unpaid orders
+          </p>
         </div>
         <button onClick={fetchDebtOrders} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -165,6 +176,28 @@ export default function DebtPage() {
         </div>
       ) : (
         <>
+          {/* Filters */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[220px]">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by customer name..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
+              />
+            </div>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white"
+            />
+          </div>
+
           {/* Summary */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-white rounded-2xl border border-orange-100 shadow-sm p-5">
@@ -173,13 +206,19 @@ export default function DebtPage() {
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">Pending Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{filteredOrders.length}</p>
             </div>
           </div>
 
           {/* Debt Orders */}
-          <div className="space-y-4">
-            {orders.map(order => {
+          {filteredOrders.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+              <p className="font-semibold text-gray-700">No matching debts</p>
+              {hasFilters && <p className="text-sm text-gray-400 mt-1">Try a different name or date.</p>}
+            </div>
+          ) : (
+            <div className="space-y-4">
+            {filteredOrders.map(order => {
               const remaining = getRemaining(order);
               const isProcessing = processingId === order.id;
               const isOwnDebt = order.user_id === currentAdminId;
@@ -270,7 +309,8 @@ export default function DebtPage() {
                 </div>
               );
             })}
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>

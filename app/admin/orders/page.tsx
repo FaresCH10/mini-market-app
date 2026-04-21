@@ -22,6 +22,7 @@ export default function OrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -29,8 +30,8 @@ export default function OrdersPage() {
   const supabase = createClient();
 
   useEffect(() => { checkAuthAndFetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { applyFilters(); }, [orders, typeFilter, statusFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setCurrentPage(1); }, [typeFilter, statusFilter, search]);
+  useEffect(() => { applyFilters(); }, [orders, typeFilter, statusFilter, dateFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setCurrentPage(1); }, [typeFilter, statusFilter, dateFilter, search]);
 
   const checkAuthAndFetch = async () => {
     try {
@@ -57,6 +58,7 @@ export default function OrdersPage() {
     let result = [...orders];
     if (typeFilter !== "all") result = result.filter(o => o.type === typeFilter);
     if (statusFilter !== "all") result = result.filter(o => o.payment_status === statusFilter);
+    if (dateFilter) result = result.filter(o => o.created_at.slice(0, 10) === dateFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(o => o.user_name.toLowerCase().includes(q) || o.user_email.toLowerCase().includes(q) || o.id.toLowerCase().includes(q));
@@ -70,23 +72,21 @@ export default function OrdersPage() {
 
     setDeletingId(orderId);
     try {
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .delete()
-        .eq("order_id", orderId);
-      if (itemsError) throw itemsError;
-
-      const { error: orderError } = await supabase
-        .from("orders")
-        .delete()
-        .eq("id", orderId);
-      if (orderError) throw orderError;
+      const res = await fetch(`/api/admin/orders-data?orderId=${encodeURIComponent(orderId)}`, {
+        method: "DELETE",
+      });
+      const body = await res.json() as { deleted?: boolean; orderId?: string; error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Failed to delete order");
+      if (!body.deleted || body.orderId !== orderId) {
+        throw new Error("Order deletion was not confirmed");
+      }
 
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
       if (expandedId === orderId) setExpandedId(null);
       toast.success("Order deleted");
-    } catch {
-      toast.error("Failed to delete order");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete order";
+      toast.error(message);
     } finally {
       setDeletingId(null);
     }
@@ -153,6 +153,12 @@ export default function OrdersPage() {
           <option value="partial">Partial</option>
           <option value="pending">Pending</option>
         </select>
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={e => setDateFilter(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white"
+        />
         <span className="text-xs text-gray-400">
           {filtered.length} of {orders.length} • Page {safePage} / {totalPages}
         </span>

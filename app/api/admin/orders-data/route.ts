@@ -20,34 +20,51 @@ type OrderItemRow = {
   price: number;
 };
 
+const getAdminServiceClient = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+  return createServiceSupabase(supabaseUrl, serviceRoleKey);
+};
+
+const requireAdmin = async () => {
+  const authClient = await createServerSupabase();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return { ok: false as const, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+
+  const { data: profile } = await authClient
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin") {
+    return { ok: false as const, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+
+  const adminClient = getAdminServiceClient();
+  if (!adminClient) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: "Server is not configured." }, { status: 500 }),
+    };
+  }
+
+  return { ok: true as const, adminClient };
+};
+
 export async function GET(req: NextRequest) {
   try {
-    const authClient = await createServerSupabase();
-    const {
-      data: { user },
-    } = await authClient.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await authClient
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json({ error: "Server is not configured." }, { status: 500 });
-    }
-
-    const adminClient = createServiceSupabase(supabaseUrl, serviceRoleKey);
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+    const { adminClient } = auth;
     const mode = req.nextUrl.searchParams.get("mode") ?? "all";
 
     let ordersQuery = adminClient
@@ -107,6 +124,45 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ orders: hydrated });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+    const { adminClient } = auth;
+
+    const orderId = req.nextUrl.searchParams.get("orderId");
+    if (!orderId) {
+      return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
+    }
+
+    const { error: itemsError } = await adminClient
+      .from("order_items")
+      .delete()
+      .eq("order_id", orderId);
+    if (itemsError) {
+      return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    }
+
+    const { data: deletedRows, error: orderError } = await adminClient
+      .from("orders")
+      .delete()
+      .eq("id", orderId)
+      .select("id");
+    if (orderError) {
+      return NextResponse.json({ error: orderError.message }, { status: 500 });
+    }
+
+    if (!deletedRows || deletedRows.length === 0) {
+      return NextResponse.json({ error: "Order not found or not deleted" }, { status: 404 });
+    }
+
+    return NextResponse.json({ deleted: true, orderId: deletedRows[0].id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

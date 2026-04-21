@@ -123,7 +123,7 @@ export default function TodaysYieldPage() {
         {[
           { label: "Customers", value: users.length, color: "text-gray-900" },
           { label: "Orders", value: totalOrders, color: "text-gray-900" },
-          { label: "Total Revenue", value: formatLira(grandTotal), color: "text-[#1B2D72]" },
+          { label: "Total Earned", value: formatLira(grandTotal), color: "text-[#1B2D72]" },
           { label: "Outstanding", value: formatLira(grandDebt), color: grandDebt > 0 ? "text-red-500" : "text-emerald-600" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
