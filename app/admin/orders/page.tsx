@@ -112,26 +112,26 @@ export default function OrdersPage() {
   if (loading) return (
     <div>
       <div className="mb-6"><div className="h-7 bg-gray-100 rounded w-32 animate-pulse" /></div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse"><div className="h-3 bg-gray-100 rounded w-2/3 mb-2" /><div className="h-7 bg-gray-100 rounded w-1/2" /></div>)}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse"><div className="h-3 bg-gray-100 rounded w-2/3 mb-2" /><div className="h-7 bg-gray-100 rounded w-1/2" /></div>)}</div>
       <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white rounded-2xl border border-gray-100 h-16 animate-pulse" />)}</div>
     </div>
   );
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Orders</h1>
           <p className="text-sm text-gray-500 mt-0.5">{orders.length} total orders</p>
         </div>
-        <button onClick={fetchOrders} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={fetchOrders} className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           Refresh
         </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
         {[
           { label: 'Total Orders', value: orders.length, color: 'text-gray-900' },
           { label: 'Paid', value: orders.filter(o => o.payment_status === 'paid').length, color: 'text-emerald-600' },
@@ -147,18 +147,18 @@ export default function OrdersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 mb-4 flex flex-wrap gap-3 items-center">
+        <div className="relative w-full lg:flex-1 lg:min-w-[220px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input type="text" placeholder="Search by name, email, or order ID..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all" />
         </div>
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white">
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="w-full sm:w-auto border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white">
           <option value="all">All Types</option>
           <option value="purchase">Purchase</option>
           <option value="dept">Debt</option>
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full sm:w-auto border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white">
           <option value="all">All Statuses</option>
           <option value="paid">Paid</option>
           <option value="partial">Partial</option>
@@ -168,9 +168,9 @@ export default function OrdersPage() {
           type="date"
           value={dateFilter}
           onChange={e => setDateFilter(e.target.value)}
-          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white"
+          className="w-full sm:w-auto border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 bg-white"
         />
-        <span className="text-xs text-gray-400">
+        <span className="w-full lg:w-auto text-xs text-gray-400">
           {filtered.length} of {orders.length} • Page {safePage} / {totalPages}
         </span>
       </div>
@@ -188,27 +188,35 @@ export default function OrdersPage() {
             return (
               <div key={order.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <button
-                  className="w-full text-left px-5 py-3.5 hover:bg-gray-50/50 transition-colors flex flex-wrap items-center gap-3"
+                  className="w-full text-left px-4 sm:px-5 py-3.5 hover:bg-gray-50/50 transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : order.id)}
                 >
-                  <span className="font-mono text-sm font-semibold text-gray-700">#{order.id.slice(0, 8)}</span>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${PAYMENT_BADGE[order.payment_status] ?? 'bg-gray-50 text-gray-600 border-gray-100'}`}>
-                    {order.payment_status}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100 capitalize">{order.type}</span>
-                  <span className="flex-1 text-sm text-gray-500 truncate">{order.user_name} <span className="text-gray-400">({order.user_email})</span></span>
-                  <span className="font-bold text-gray-900 text-sm">{formatLira(order.total_price)}</span>
-                  {order.type === "dept" && order.payment_status !== "paid" && (
-                    <span className="text-xs text-red-500">Due: {formatLira(remaining)}</span>
-                  )}
-                  <span className="text-xs text-gray-400 hidden sm:block">{new Date(order.created_at).toLocaleDateString()}</span>
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-sm font-semibold text-gray-700">#{order.id.slice(0, 8)}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${PAYMENT_BADGE[order.payment_status] ?? 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+                        {order.payment_status}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100 capitalize">{order.type}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-bold text-gray-900 text-sm">{formatLira(order.total_price)}</span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 text-sm">
+                    <span className="text-gray-500 truncate">{order.user_name} <span className="text-gray-400">({order.user_email})</span></span>
+                    <span className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString()}</span>
+                    {order.type === "dept" && order.payment_status !== "paid" && (
+                      <span className="text-xs text-red-500">Due: {formatLira(remaining)}</span>
+                    )}
+                  </div>
                 </button>
 
                 {isExpanded && (
-                  <div className="border-t border-gray-50 px-5 py-4 bg-gray-50/30">
+                  <div className="border-t border-gray-50 px-4 sm:px-5 py-4 bg-gray-50/30">
                     <p className="text-xs text-gray-400 mb-3">{new Date(order.created_at).toLocaleString()}</p>
                     <div className="space-y-1.5">
                       {order.items.length === 0 ? <p className="text-sm text-gray-400">No items found.</p> : order.items.map((item, i) => (
@@ -230,7 +238,7 @@ export default function OrdersPage() {
                       <button
                         onClick={() => handleDeleteOrder(order.id)}
                         disabled={deletingId === order.id}
-                        className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {deletingId === order.id ? "Deleting..." : "Delete Order"}
                       </button>
@@ -244,22 +252,22 @@ export default function OrdersPage() {
       )}
 
       {filtered.length > PAGE_SIZE && (
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-xs text-gray-400">
             Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="w-full sm:w-auto flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Previous
             </button>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Next
             </button>

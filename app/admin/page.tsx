@@ -173,18 +173,18 @@ export default function AdminDashboard() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Overview of your store</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 mb-8">
         {statCards.map((card) => (
           <Link
             key={card.label}
             href={card.href}
-            className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-all hover:-translate-y-0.5"
+            className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 hover:shadow-md transition-all hover:-translate-y-0.5"
           >
             <div className="flex items-start justify-between mb-4">
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} text-white flex items-center justify-center shadow-sm`}>
@@ -194,22 +194,22 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{card.value}</p>
             <p className="text-sm font-medium text-gray-600 mt-0.5">{card.label}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{card.sub}</p>
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{card.sub}</p>
           </Link>
         ))}
       </div>
 
       {/* Quick Actions */}
       <div className="mb-2">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 sm:mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {quickLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`border rounded-2xl p-4 transition-all ${link.color}`}
+              className={`border rounded-2xl p-3.5 sm:p-4 transition-all ${link.color}`}
             >
               <p className="font-semibold text-sm">{link.label}</p>
               <p className="text-xs mt-1 opacity-70">{link.desc}</p>
