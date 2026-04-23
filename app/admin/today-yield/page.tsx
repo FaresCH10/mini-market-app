@@ -25,6 +25,11 @@ type UserYield = {
   total_spent: number;
   total_paid: number;
 };
+type TopProduct = {
+  name: string;
+  units: number;
+  sales: number;
+};
 
 const PAYMENT_BADGE: Record<string, string> = {
   paid: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -69,6 +74,22 @@ export default function TodaysYieldPage() {
   const grandTotal = users.reduce((s, u) => s + u.total_spent, 0);
   const grandPaid = users.reduce((s, u) => s + u.total_paid, 0);
   const grandDebt = grandTotal - grandPaid;
+  const topProducts = Array.from(
+    users.reduce((acc, user) => {
+      user.orders.forEach((order) => {
+        order.items.forEach((item) => {
+          const key = item.product_name?.trim() || "Unknown Product";
+          const current = acc.get(key) ?? { name: key, units: 0, sales: 0 };
+          current.units += item.quantity;
+          current.sales += item.quantity * item.price;
+          acc.set(key, current);
+        });
+      });
+      return acc;
+    }, new Map<string, TopProduct>()).values()
+  )
+    .sort((a, b) => b.units - a.units || b.sales - a.sales)
+    .slice(0, 5);
 
   const cutoffDate = cutoff ? new Date(cutoff) : null;
   const cutoffLabel = cutoffDate
@@ -131,6 +152,42 @@ export default function TodaysYieldPage() {
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Most sold products */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Most Sold Products Today</h2>
+          <span className="text-xs text-gray-400">Top {topProducts.length || 0}</span>
+        </div>
+
+        {topProducts.length === 0 ? (
+          <p className="text-sm text-gray-400">No sold products yet for today.</p>
+        ) : (
+          <div className="space-y-2">
+            {topProducts.map((product, index) => (
+              <div
+                key={product.name}
+                className="rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-6 h-6 rounded-full bg-[#1B2D72]/10 text-[#1B2D72] text-xs font-semibold flex items-center justify-center shrink-0">
+                    {index + 1}
+                  </span>
+                  <p className="text-sm font-medium text-gray-800 truncate">{product.name}</p>
+                </div>
+                <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm">
+                  <span className="text-gray-500">
+                    Units: <span className="font-semibold text-gray-800">{product.units}</span>
+                  </span>
+                  <span className="text-gray-500">
+                    Sales: <span className="font-semibold text-[#1B2D72]">{formatLira(product.sales)}</span>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* User list */}
