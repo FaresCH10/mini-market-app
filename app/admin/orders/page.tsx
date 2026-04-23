@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { formatLira } from "@/lib/currency";
 
-type OrderItem = { product_name: string; quantity: number; price: number };
+type OrderItem = { product_id: string | null; product_name: string; quantity: number; price: number };
 type Order = { id: string; total_price: number; paid_amount: number; type: string; status: string; payment_status: string; created_at: string; user_id: string; user_name: string; user_email: string; items: OrderItem[] };
+type ProductOption = { id: string; name: string; price: number; sell_price: number | null; quantity: number };
+type DraftOrderItem = { product_id: string; quantity: number; existingPrice: number };
 
 const PAYMENT_BADGE: Record<string, string> = {
   paid: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -27,6 +29,10 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [draftItems, setDraftItems] = useState<DraftOrderItem[]>([]);
+  const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -40,7 +46,7 @@ export default function OrdersPage() {
       if (!user) { router.push('/auth/login'); return; }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (profile?.role !== "admin") { toast.error("Admin access only"); router.push("/"); return; }
-      await fetchOrders();
+      await Promise.all([fetchOrders(), fetchProducts()]);
     } catch { router.push("/"); }
   };
 
@@ -62,6 +68,19 @@ export default function OrdersPage() {
       setTotalRevenueAllTime(Number(revenueBody.revenue ?? 0));
     } catch { toast.error("Failed to load orders"); }
     finally { setLoading(false); }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, price, sell_price, quantity")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      setProducts((data ?? []) as ProductOption[]);
+    } catch {
+      toast.error("Failed to load products");
+    }
   };
 
   const applyFilters = () => {
@@ -99,6 +118,112 @@ export default function OrdersPage() {
       toast.error(message);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const getProductPrice = (productId: string, fallbackPrice = 0) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return fallbackPrice;
+    return Number(product.sell_price ?? Number((Number(product.price ?? 0) * 1.2).toFixed(2)));
+  };
+
+  const getDraftTotal = () =>
+    draftItems.reduce((sum, item) => sum + getProductPrice(item.product_id, item.existingPrice) * item.quantity, 0);
+
+  const startEditingItems = (order: Order) => {
+    if (products.length === 0) {
+      toast.error("No products available for editing");
+      return;
+    }
+    const prepared = order.items
+      .map((item) => {
+        const fallbackProductId = item.product_id ?? products.find((p) => p.name === item.product_name)?.id;
+        if (!fallbackProductId) return null;
+        return {
+          product_id: fallbackProductId,
+          quantity: Math.max(1, Number(item.quantity ?? 1)),
+          existingPrice: Number(item.price ?? 0),
+        } satisfies DraftOrderItem;
+      })
+      .filter((item): item is DraftOrderItem => Boolean(item));
+
+    if (prepared.length === 0) {
+      setDraftItems([{ product_id: products[0].id, quantity: 1, existingPrice: getProductPrice(products[0].id, 0) }]);
+    } else {
+      setDraftItems(prepared);
+    }
+    setEditingOrderId(order.id);
+  };
+
+  const cancelEditingItems = () => {
+    setEditingOrderId(null);
+    setDraftItems([]);
+  };
+
+  const updateDraftItemProduct = (index: number, productId: string) => {
+    setDraftItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, product_id: productId, existingPrice: getProductPrice(productId, item.existingPrice) } : item)),
+    );
+  };
+
+  const updateDraftItemQuantity = (index: number, quantity: number) => {
+    setDraftItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, quantity: Math.max(1, Math.floor(Number(quantity) || 1)) } : item)),
+    );
+  };
+
+  const addDraftItem = () => {
+    if (products.length === 0) return;
+    setDraftItems((prev) => [
+      ...prev,
+      { product_id: products[0].id, quantity: 1, existingPrice: getProductPrice(products[0].id, 0) },
+    ]);
+  };
+
+  const removeDraftItem = (index: number) => {
+    setDraftItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveOrderItems = async (order: Order) => {
+    if (draftItems.length === 0) {
+      toast.error("Order must contain at least one item");
+      return;
+    }
+    setSavingOrderId(order.id);
+    try {
+      const res = await fetch("/api/admin/orders-data", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          items: draftItems.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+        }),
+      });
+      const body = await res.json() as {
+        error?: string;
+        order?: { id: string; total_price: number; items: OrderItem[] };
+      };
+      if (!res.ok) throw new Error(body.error ?? "Failed to update order");
+      if (!body.order) throw new Error("Updated order payload is missing");
+
+      setOrders((prev) =>
+        prev.map((existing) =>
+          existing.id === order.id
+            ? {
+                ...existing,
+                total_price: Number(body.order?.total_price ?? existing.total_price),
+                items: body.order?.items ?? existing.items,
+              }
+            : existing,
+        ),
+      );
+      cancelEditingItems();
+      toast.success("Order items updated");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update order";
+      toast.error(message);
+    } finally {
+      setSavingOrderId(null);
     }
   };
 
@@ -184,14 +309,16 @@ export default function OrdersPage() {
         <div className="space-y-2">
           {paginatedOrders.map(order => {
             const isExpanded = expandedId === order.id;
+            const isEditing = editingOrderId === order.id;
             const remaining = order.total_price - (order.paid_amount || 0);
+            const draftTotal = isEditing ? getDraftTotal() : order.total_price;
             return (
               <div key={order.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <button
                   className="w-full text-left px-4 sm:px-5 py-3.5 hover:bg-gray-50/50 transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : order.id)}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-sm font-semibold text-gray-700">#{order.id.slice(0, 8)}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${PAYMENT_BADGE[order.payment_status] ?? 'bg-gray-50 text-gray-600 border-gray-100'}`}>
@@ -199,8 +326,8 @@ export default function OrdersPage() {
                       </span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100 capitalize">{order.type}</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-bold text-gray-900 text-sm">{formatLira(order.total_price)}</span>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:shrink-0">
+                      <span className="font-bold text-gray-900 text-sm">{formatLira(draftTotal)}</span>
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -218,14 +345,64 @@ export default function OrdersPage() {
                 {isExpanded && (
                   <div className="border-t border-gray-50 px-4 sm:px-5 py-4 bg-gray-50/30">
                     <p className="text-xs text-gray-400 mb-3">{new Date(order.created_at).toLocaleString()}</p>
-                    <div className="space-y-1.5">
-                      {order.items.length === 0 ? <p className="text-sm text-gray-400">No items found.</p> : order.items.map((item, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="text-gray-700">{item.product_name} <span className="text-gray-400">× {item.quantity}</span></span>
-                          <span className="font-medium text-gray-900">{formatLira(Number((item.price * item.quantity).toFixed(2)))}</span>
+                    {isEditing ? (
+                      <div className="space-y-2.5">
+                        {draftItems.map((item, i) => {
+                          const linePrice = getProductPrice(item.product_id, item.existingPrice);
+                          return (
+                            <div key={`${item.product_id}-${i}`} className="rounded-xl border border-gray-200 bg-white p-2.5 sm:p-2 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                              <select
+                                value={item.product_id}
+                                onChange={(e) => updateDraftItemProduct(i, e.target.value)}
+                                className="sm:col-span-6 border border-gray-200 rounded-lg px-2 py-2 sm:py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20"
+                              >
+                                {products.map((product) => (
+                                  <option key={product.id} value={product.id}>
+                                    {product.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={(e) => updateDraftItemQuantity(i, Number(e.target.value))}
+                                className="sm:col-span-2 border border-gray-200 rounded-lg px-2 py-2 sm:py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20"
+                              />
+                              <div className="sm:col-span-3 text-sm text-left sm:text-right text-gray-700 font-medium">
+                                {formatLira(Number((linePrice * item.quantity).toFixed(2)))}
+                              </div>
+                              <button
+                                onClick={() => removeDraftItem(i)}
+                                disabled={draftItems.length === 1 || savingOrderId === order.id}
+                                className="sm:col-span-1 w-full sm:w-auto px-2 py-2 sm:py-1.5 rounded-lg border border-red-100 text-red-600 text-xs font-semibold hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                              >
+                                X
+                              </button>
+                            </div>
+                          );
+                        })}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1">
+                          <button
+                            onClick={addDraftItem}
+                            disabled={savingOrderId === order.id}
+                            className="w-full sm:w-auto px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            + Add Item
+                          </button>
+                          <p className="text-sm font-semibold text-gray-800">New Total: {formatLira(Number(draftTotal.toFixed(2)))}</p>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {order.items.length === 0 ? <p className="text-sm text-gray-400">No items found.</p> : order.items.map((item, i) => (
+                          <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-sm">
+                            <span className="text-gray-700 break-words">{item.product_name} <span className="text-gray-400">× {item.quantity}</span></span>
+                            <span className="font-medium text-gray-900">{formatLira(Number((item.price * item.quantity).toFixed(2)))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {order.type === "dept" && order.paid_amount > 0 && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
                         <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
@@ -234,10 +411,35 @@ export default function OrdersPage() {
                         <p className="text-xs text-gray-400">Paid {formatLira(order.paid_amount)} of {formatLira(order.total_price)} ({((order.paid_amount / order.total_price) * 100).toFixed(0)}%)</p>
                       </div>
                     )}
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={cancelEditingItems}
+                            disabled={savingOrderId === order.id}
+                            className="w-full sm:w-auto px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleSaveOrderItems(order)}
+                            disabled={savingOrderId === order.id}
+                            className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-[#1B2D72] border border-[#1B2D72] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {savingOrderId === order.id ? "Saving..." : "Save Items"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => startEditingItems(order)}
+                          className="w-full sm:w-auto px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
+                        >
+                          Edit Items
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteOrder(order.id)}
-                        disabled={deletingId === order.id}
+                        disabled={deletingId === order.id || savingOrderId === order.id}
                         className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {deletingId === order.id ? "Deleting..." : "Delete Order"}
