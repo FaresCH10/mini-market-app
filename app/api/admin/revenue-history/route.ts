@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient as createServerSupabase } from "@/lib/supabase/server";
 import { createClient as createServiceSupabase } from "@supabase/supabase-js";
 
-type PaidOrderRow = {
+type RevenueOrderRow = {
   id: string;
   created_at: string;
+  total_price: number;
+  paid_amount: number | null;
+  payment_status: string | null;
 };
 
 type OrderItemRow = {
@@ -67,6 +70,23 @@ const getBusinessDayKey = (createdAt: string): string | null => {
   return toDayKey(previousDayParts);
 };
 
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const getPaidRatio = (order: RevenueOrderRow): number => {
+  const totalPrice = Number(order.total_price ?? 0);
+  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0;
+
+  const paidAmount = Number(order.paid_amount ?? 0);
+  let ratio = paidAmount / totalPrice;
+
+  // Keep backward compatibility for old fully paid rows that may not store paid_amount.
+  if ((!Number.isFinite(ratio) || ratio <= 0) && order.payment_status === "paid") {
+    ratio = 1;
+  }
+
+  return clamp01(Number.isFinite(ratio) ? ratio : 0);
+};
+
 export async function GET() {
   try {
     const authClient = await createServerSupabase();
@@ -93,16 +113,15 @@ export async function GET() {
     }
     const adminClient = createServiceSupabase(supabaseUrl, serviceRoleKey);
 
-    const { data: paidOrders, error: ordersError } = await adminClient
+    const { data: revenueOrders, error: ordersError } = await adminClient
       .from("orders")
-      .select("id, created_at")
-      .eq("payment_status", "paid")
+      .select("id, created_at, total_price, paid_amount, payment_status")
       .order("created_at", { ascending: false });
     if (ordersError) {
       return NextResponse.json({ error: ordersError.message }, { status: 500 });
     }
 
-    const orders = (paidOrders ?? []) as PaidOrderRow[];
+    const orders = (revenueOrders ?? []) as RevenueOrderRow[];
     if (orders.length === 0) {
       return NextResponse.json({ history: [] });
     }
@@ -131,22 +150,26 @@ export async function GET() {
     }
 
     const productById = new Map((productRows ?? []).map((p) => [p.id, p]));
-    const revenueByOrderId = new Map<string, number>();
+    const fullProfitByOrderId = new Map<string, number>();
     for (const item of (items ?? []) as OrderItemRow[]) {
       if (!item.product_id) continue;
       const basePrice = Number(productById.get(item.product_id)?.price ?? 0);
       const sellPrice = Number(item.price ?? 0);
       const quantity = Number(item.quantity ?? 0);
-      const itemRevenue = Math.max(0, sellPrice - basePrice) * quantity;
-      revenueByOrderId.set(item.order_id, (revenueByOrderId.get(item.order_id) ?? 0) + itemRevenue);
+      const itemProfit = Math.max(0, sellPrice - basePrice) * quantity;
+      fullProfitByOrderId.set(item.order_id, (fullProfitByOrderId.get(item.order_id) ?? 0) + itemProfit);
     }
 
     const revenueByDay = new Map<string, number>();
     for (const order of orders) {
       const dayKey = getBusinessDayKey(order.created_at);
       if (!dayKey) continue;
-      const revenue = revenueByOrderId.get(order.id) ?? 0;
-      revenueByDay.set(dayKey, (revenueByDay.get(dayKey) ?? 0) + revenue);
+      const fullOrderProfit = fullProfitByOrderId.get(order.id) ?? 0;
+      if (fullOrderProfit <= 0) continue;
+      const paidRatio = getPaidRatio(order);
+      if (paidRatio <= 0) continue;
+      const recognizedProfit = fullOrderProfit * paidRatio;
+      revenueByDay.set(dayKey, (revenueByDay.get(dayKey) ?? 0) + recognizedProfit);
     }
 
     const history = [...revenueByDay.entries()]

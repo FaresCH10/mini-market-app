@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabase } from "@/lib/supabase/server";
 import { createClient as createServiceSupabase } from "@supabase/supabase-js";
 
-type PaidOrderRow = {
+type RevenueOrderRow = {
   id: string;
   created_at: string;
+  total_price: number;
+  paid_amount: number | null;
+  payment_status: string | null;
 };
 
 type OrderItemRow = {
@@ -102,6 +105,23 @@ const getBusinessDayStartMs = (now: Date): number => {
   );
 };
 
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const getPaidRatio = (order: RevenueOrderRow): number => {
+  const totalPrice = Number(order.total_price ?? 0);
+  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0;
+
+  const paidAmount = Number(order.paid_amount ?? 0);
+  let ratio = paidAmount / totalPrice;
+
+  // Keep backward compatibility for old fully paid rows that may not store paid_amount.
+  if ((!Number.isFinite(ratio) || ratio <= 0) && order.payment_status === "paid") {
+    ratio = 1;
+  }
+
+  return clamp01(Number.isFinite(ratio) ? ratio : 0);
+};
+
 export async function GET(req: NextRequest) {
   try {
     const authClient = await createServerSupabase();
@@ -138,40 +158,39 @@ export async function GET(req: NextRequest) {
     const windowStartIso = new Date(businessDayStartMs).toISOString();
     const nowIso = now.toISOString();
 
-    let paidOrdersQuery = adminClient
+    let revenueOrdersQuery = adminClient
       .from("orders")
-      .select("id, created_at")
-      .eq("payment_status", "paid")
+      .select("id, created_at, total_price, paid_amount, payment_status")
       .order("created_at", { ascending: false });
 
     if (!includeAllTime) {
-      paidOrdersQuery = paidOrdersQuery
+      revenueOrdersQuery = revenueOrdersQuery
         .gte("created_at", windowStartIso)
         .lte("created_at", nowIso);
     }
 
-    const { data: paidOrders, error: paidOrdersError } = await paidOrdersQuery;
+    const { data: revenueOrders, error: revenueOrdersError } = await revenueOrdersQuery;
 
-    if (paidOrdersError) {
-      return NextResponse.json({ error: paidOrdersError.message }, { status: 500 });
+    if (revenueOrdersError) {
+      return NextResponse.json({ error: revenueOrdersError.message }, { status: 500 });
     }
 
-    const paidOrdersInWindow = includeAllTime
-      ? ((paidOrders ?? []) as PaidOrderRow[])
-      : ((paidOrders ?? []) as PaidOrderRow[]).filter((order) => {
+    const ordersInWindow = includeAllTime
+      ? ((revenueOrders ?? []) as RevenueOrderRow[])
+      : ((revenueOrders ?? []) as RevenueOrderRow[]).filter((order) => {
           const createdAtMs = new Date(order.created_at).getTime();
           return Number.isFinite(createdAtMs) && createdAtMs >= businessDayStartMs && createdAtMs <= nowMs;
         });
-    const paidOrderIds = paidOrdersInWindow.map((order) => order.id);
+    const orderIds = ordersInWindow.map((order) => order.id);
 
-    if (paidOrderIds.length === 0) {
+    if (orderIds.length === 0) {
       return NextResponse.json({ revenue: 0, orderCount: 0, windowStartIso });
     }
 
     const { data: items, error: itemsError } = await adminClient
       .from("order_items")
       .select("order_id, product_id, quantity, price")
-      .in("order_id", paidOrderIds);
+      .in("order_id", orderIds);
 
     if (itemsError) {
       return NextResponse.json({ error: itemsError.message }, { status: 500 });
@@ -197,18 +216,30 @@ export async function GET(req: NextRequest) {
     }
 
     const productById = new Map((productRows ?? []).map((product) => [product.id, product]));
-    const revenue = ((items ?? []) as OrderItemRow[]).reduce((sum, item) => {
-      if (!item.product_id) return sum;
+    const fullProfitByOrderId = new Map<string, number>();
+    for (const item of (items ?? []) as OrderItemRow[]) {
+      if (!item.product_id) continue;
       const product = productById.get(item.product_id);
       const sellPrice = Number(item.price ?? 0);
       const basePrice = Number(product?.price ?? 0);
       const quantity = Number(item.quantity ?? 0);
-      return sum + Math.max(0, sellPrice - basePrice) * quantity;
+      const itemProfit = Math.max(0, sellPrice - basePrice) * quantity;
+      fullProfitByOrderId.set(item.order_id, (fullProfitByOrderId.get(item.order_id) ?? 0) + itemProfit);
+    }
+
+    let orderCount = 0;
+    const revenue = ordersInWindow.reduce((sum, order) => {
+      const fullOrderProfit = fullProfitByOrderId.get(order.id) ?? 0;
+      if (fullOrderProfit <= 0) return sum;
+      const paidRatio = getPaidRatio(order);
+      if (paidRatio <= 0) return sum;
+      orderCount += 1;
+      return sum + fullOrderProfit * paidRatio;
     }, 0);
 
     return NextResponse.json({
       revenue,
-      orderCount: paidOrderIds.length,
+      orderCount,
       windowStartIso,
     });
   } catch (error) {

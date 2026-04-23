@@ -109,7 +109,7 @@ export default function RevenueHistoryPage() {
       {rows.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
           <p className="font-semibold text-gray-700">No revenue history yet</p>
-          <p className="text-sm text-gray-400 mt-1">Daily revenue rows will appear after paid orders are recorded.</p>
+          <p className="text-sm text-gray-400 mt-1">Daily revenue rows will appear after order payments are recorded.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
