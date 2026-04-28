@@ -276,78 +276,84 @@ export default function CartPage() {
           {items.map((item) => (
             <div
               key={item.product_id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4"
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4"
             >
-              <div className="relative w-16 h-16 rounded-xl bg-gray-50 flex-shrink-0 overflow-hidden">
-                <Image
-                  src={safeImg(item.image_url)}
-                  alt={item.name}
-                  fill
-                  className={
-                    safeImg(item.image_url) !== MARKET_LOGO_PLACEHOLDER
-                      ? "object-cover"
-                      : "object-contain p-2 opacity-90"
-                  }
-                />
-              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex items-start gap-3 sm:flex-1 sm:min-w-0">
+                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-gray-50 flex-shrink-0 overflow-hidden">
+                    <Image
+                      src={safeImg(item.image_url)}
+                      alt={item.name}
+                      fill
+                      className={
+                        safeImg(item.image_url) !== MARKET_LOGO_PLACEHOLDER
+                          ? "object-cover"
+                          : "object-contain p-2 opacity-90"
+                      }
+                    />
+                  </div>
 
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 truncate">
-                  {item.name}
-                </h3>
-                <p className="text-sm font-bold text-[#1B2D72]">
-                  {formatLira(item.price)}
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-1">
-                  <button
-                    onClick={() =>
-                      handleUpdateQuantity(
-                        item.product_id,
-                        item.quantity - 1,
-                        item.stock,
-                      )
-                    }
-                    className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-red-500 transition-colors flex items-center justify-center"
-                  >
-                    −
-                  </button>
-                  <span className="w-8 text-center text-sm font-bold text-gray-900">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() =>
-                      handleUpdateQuantity(
-                        item.product_id,
-                        item.quantity + 1,
-                        item.stock,
-                      )
-                    }
-                    disabled={item.quantity >= item.stock}
-                    className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-                  >
-                    +
-                  </button>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-gray-900 truncate">
+                      {item.name}
+                    </h3>
+                    <p className="text-sm font-bold text-[#1B2D72] whitespace-nowrap">
+                      {formatLira(item.price)}
+                    </p>
+                  </div>
                 </div>
-                {item.quantity >= item.stock && (
-                  <span className="text-[10px] text-orange-500 font-medium">
-                    Max stock
-                  </span>
-                )}
-              </div>
 
-              <div className="text-right shrink-0">
-                <p className="font-bold text-gray-900">
-                  {formatLira(item.price * item.quantity)}
-                </p>
-                <button
-                  onClick={() => handleRemoveItem(item.product_id, item.name)}
-                  className="text-xs text-red-400 hover:text-red-600 transition-colors mt-0.5"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center justify-between sm:justify-end sm:gap-4">
+                  <div className="flex flex-col items-start sm:items-center gap-1">
+                    <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-1">
+                      <button
+                        onClick={() =>
+                          handleUpdateQuantity(
+                            item.product_id,
+                            item.quantity - 1,
+                            item.stock,
+                          )
+                        }
+                        className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-red-500 transition-colors flex items-center justify-center"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center text-sm font-bold text-gray-900">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() =>
+                          handleUpdateQuantity(
+                            item.product_id,
+                            item.quantity + 1,
+                            item.stock,
+                          )
+                        }
+                        disabled={item.quantity >= item.stock}
+                        className="w-8 h-8 rounded-lg bg-white shadow-sm text-gray-600 font-bold hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {item.quantity >= item.stock && (
+                      <span className="text-[10px] text-orange-500 font-medium">
+                        Max stock
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-right shrink-0 min-w-[96px]">
+                    <p className="font-bold text-gray-900 whitespace-nowrap">
+                      {formatLira(item.price * item.quantity)}
+                    </p>
+                    <button
+                      onClick={() => handleRemoveItem(item.product_id, item.name)}
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors mt-0.5"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
