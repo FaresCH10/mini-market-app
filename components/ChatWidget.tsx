@@ -71,7 +71,23 @@ const ChatIcon = () => (
   </svg>
 );
 
-export default function ChatWidget() {
+const CartIcon = () => (
+  <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="20" r="1" />
+    <circle cx="18" cy="20" r="1" />
+    <path d="M3 3h2l2.3 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.7L22 7H7.2" />
+  </svg>
+);
+
+type ChatWidgetProps = {
+  fabMode?: "chat" | "cart";
+  hideFloatingFab?: boolean;
+};
+
+export default function ChatWidget({
+  fabMode = "chat",
+  hideFloatingFab = false,
+}: ChatWidgetProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -185,6 +201,17 @@ export default function ChatWidget() {
   const primaryLight = isAdmin ? "#E6F8FB" : "#E6F4F8";
   const primaryMid = isAdmin ? "#007A96" : "#1B2D72";
 
+  useEffect(() => {
+    const openHandler = () => setOpen(true);
+    const closeHandler = () => setOpen(false);
+    window.addEventListener("open-chat-widget", openHandler);
+    window.addEventListener("close-chat-widget", closeHandler);
+    return () => {
+      window.removeEventListener("open-chat-widget", openHandler);
+      window.removeEventListener("close-chat-widget", closeHandler);
+    };
+  }, []);
+
   return (
     <>
       <style>{`
@@ -227,61 +254,68 @@ export default function ChatWidget() {
         .cw-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 99px; }
       `}</style>
 
-      {/* Floating action button */}
-      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999 }}>
-        {/* Pulse ring — only when closed */}
-        {!open && userId && (
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: "50%",
-            background: primary, opacity: 0.5,
-            animation: "cw-pulse-ring 2s ease-out infinite",
-            pointerEvents: "none",
-          }} />
-        )}
-
-        <button
-          onClick={() => setOpen((o) => !o)}
-          aria-label="Toggle chat"
-          className="cw-btn-fab"
-          style={{
-            width: 56, height: 56, borderRadius: "50%", border: "none",
-            background: `linear-gradient(135deg, ${primary}, ${primaryMid})`,
-            color: "#fff", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 4px 24px ${primary}60`,
-            transition: "transform 0.2s, box-shadow 0.2s",
-            position: "relative",
-          }}
-        >
-          <div style={{
-            transition: "transform 0.3s, opacity 0.2s",
-            transform: open ? "rotate(90deg)" : "rotate(0deg)",
-          }}>
-            {open ? <CloseIcon /> : <ChatIcon />}
-          </div>
-
-          {/* Unread dot */}
-          {!open && messages.length > 1 && (
+      {!hideFloatingFab && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999 }}>
+          {/* Pulse ring — chat mode only */}
+          {fabMode === "chat" && !open && userId && (
             <div style={{
-              position: "absolute", top: 4, right: 4,
-              width: 10, height: 10, borderRadius: "50%",
-              background: "#ef4444", border: "2px solid #fff",
+              position: "absolute", inset: 0, borderRadius: "50%",
+              background: primary, opacity: 0.5,
+              animation: "cw-pulse-ring 2s ease-out infinite",
+              pointerEvents: "none",
             }} />
           )}
-        </button>
 
-        {/* Role badge */}
-        {isAdmin && !open && (
-          <div style={{
-            position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
-            background: primary, color: "#fff", fontSize: 9, fontWeight: 800,
-            padding: "2px 8px", borderRadius: 99, letterSpacing: "0.08em",
-            whiteSpace: "nowrap", boxShadow: `0 2px 8px ${primary}50`,
-          }}>
-            ADMIN
-          </div>
-        )}
-      </div>
+          <button
+            onClick={() => {
+              if (fabMode === "cart") {
+                router.push("/cart");
+                return;
+              }
+              setOpen((o) => !o);
+            }}
+            aria-label={fabMode === "cart" ? "Go to cart" : "Toggle chat"}
+            className="cw-btn-fab"
+            style={{
+              width: 56, height: 56, borderRadius: "50%", border: "none",
+              background: `linear-gradient(135deg, ${primary}, ${primaryMid})`,
+              color: "#fff", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 4px 24px ${primary}60`,
+              transition: "transform 0.2s, box-shadow 0.2s",
+              position: "relative",
+            }}
+          >
+            <div style={{
+              transition: "transform 0.3s, opacity 0.2s",
+              transform: fabMode === "chat" && open ? "rotate(90deg)" : "rotate(0deg)",
+            }}>
+              {fabMode === "cart" ? <CartIcon /> : open ? <CloseIcon /> : <ChatIcon />}
+            </div>
+
+            {/* Unread dot */}
+            {fabMode === "chat" && !open && messages.length > 1 && (
+              <div style={{
+                position: "absolute", top: 4, right: 4,
+                width: 10, height: 10, borderRadius: "50%",
+                background: "#ef4444", border: "2px solid #fff",
+              }} />
+            )}
+          </button>
+
+          {/* Role badge */}
+          {fabMode === "chat" && isAdmin && !open && (
+            <div style={{
+              position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
+              background: primary, color: "#fff", fontSize: 9, fontWeight: 800,
+              padding: "2px 8px", borderRadius: 99, letterSpacing: "0.08em",
+              whiteSpace: "nowrap", boxShadow: `0 2px 8px ${primary}50`,
+            }}>
+              ADMIN
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chat panel */}
       {open && (

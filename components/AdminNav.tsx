@@ -24,6 +24,11 @@ export default function Navbar() {
   // const isWalletInDebt = balance < 0;
   const supabase = createClient();
 
+  const openChat = () => {
+    window.dispatchEvent(new CustomEvent("open-chat-widget"));
+    setIsMenuOpen(false);
+  };
+
   useEffect(() => {
     const checkAdminStatus = async (userId: string) => {
       try {
@@ -151,6 +156,16 @@ export default function Navbar() {
 
             {/* Desktop Right */}
             <div className="hidden md:flex items-center gap-3">
+              <button
+                onClick={openChat}
+                className="w-9 h-9 rounded-lg border border-gray-200 text-gray-600 hover:text-[#1B2D72] hover:bg-blue-50 transition-colors flex items-center justify-center"
+                aria-label="Open chat assistant"
+                title="Chat assistant"
+              >
+                <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </button>
               {/* {logged && (
                 <button
                   onClick={() => setShowWalletModal(true)}
@@ -237,6 +252,18 @@ export default function Navbar() {
           </Link>
 
           {logged && (
+            <button
+              onClick={openChat}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-[#1B2D72] transition-colors"
+            >
+              <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Chat Assistant
+            </button>
+          )}
+
+          {logged && (
             <Link
               href="/debt"
               onClick={() => setIsMenuOpen(false)}
@@ -321,13 +348,24 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <Link
-              href="/auth/login"
-              onClick={() => setIsMenuOpen(false)}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-[#1B2D72] hover:bg-[#00AECC] transition-colors"
-            >
-              Sign In
-            </Link>
+            <>
+              <button
+                onClick={openChat}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-[#1B2D72] transition-colors"
+              >
+                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Chat Assistant
+              </button>
+              <Link
+                href="/auth/login"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-[#1B2D72] hover:bg-[#00AECC] transition-colors"
+              >
+                Sign In
+              </Link>
+            </>
           )}
         </div>
       </div>
