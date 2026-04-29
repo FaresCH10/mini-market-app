@@ -71,12 +71,17 @@ const getBusinessDayKey = (createdAt: string): string | null => {
 };
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const toSafeMoney = (value: unknown): number => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return num;
+};
 
 const getPaidRatio = (order: RevenueOrderRow): number => {
-  const totalPrice = Number(order.total_price ?? 0);
-  if (!Number.isFinite(totalPrice) || totalPrice <= 0) return 0;
+  const totalPrice = toSafeMoney(order.total_price);
+  if (totalPrice <= 0) return 0;
 
-  const paidAmount = Number(order.paid_amount ?? 0);
+  const paidAmount = toSafeMoney(order.paid_amount);
   let ratio = paidAmount / totalPrice;
 
   // Keep backward compatibility for old fully paid rows that may not store paid_amount.
@@ -153,9 +158,9 @@ export async function GET() {
     const fullProfitByOrderId = new Map<string, number>();
     for (const item of (items ?? []) as OrderItemRow[]) {
       if (!item.product_id) continue;
-      const basePrice = Number(productById.get(item.product_id)?.price ?? 0);
-      const sellPrice = Number(item.price ?? 0);
-      const quantity = Number(item.quantity ?? 0);
+      const basePrice = toSafeMoney(productById.get(item.product_id)?.price);
+      const sellPrice = toSafeMoney(item.price);
+      const quantity = toSafeMoney(item.quantity);
       const itemProfit = Math.max(0, sellPrice - basePrice) * quantity;
       fullProfitByOrderId.set(item.order_id, (fullProfitByOrderId.get(item.order_id) ?? 0) + itemProfit);
     }

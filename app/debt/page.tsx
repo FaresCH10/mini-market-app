@@ -31,6 +31,7 @@ export default function DebtPage() {
   const [debts, setDebts] = useState<DebtOrder[]>([]);
   const [payAmounts, setPayAmounts] = useState<Record<string, string>>({});
   const [paying, setPaying] = useState<string | null>(null);
+  const [payAllLoading, setPayAllLoading] = useState(false);
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -102,6 +103,47 @@ export default function DebtPage() {
     }
   };
 
+  const handlePayAll = async () => {
+    if (payAllLoading) return;
+    if (debts.length === 0 || totalRemaining <= 0) {
+      toast.error("No outstanding debt to pay");
+      return;
+    }
+
+    setPayAllLoading(true);
+    try {
+      const updates = debts.map((debt) =>
+        supabase
+          .from("orders")
+          .update({
+            paid_amount: debt.total_price,
+            payment_status: "paid",
+            status: "completed",
+          })
+          .eq("id", debt.id),
+      );
+
+      const results = await Promise.allSettled(updates);
+      const failed = results.filter(
+        (result) =>
+          result.status === "rejected" ||
+          (result.status === "fulfilled" && result.value.error),
+      ).length;
+
+      if (failed > 0) {
+        toast.error(`${failed} debt payment${failed > 1 ? "s" : ""} failed. Please retry.`);
+      } else {
+        toast.success(`All debts paid successfully (${formatLira(totalRemaining)})`);
+      }
+
+      await fetchData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Pay all failed");
+    } finally {
+      setPayAllLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
@@ -125,8 +167,19 @@ export default function DebtPage() {
 
       {/* Summary */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
-        <p className="text-xs text-gray-400 mb-1">Total Outstanding</p>
-        <p className="text-2xl font-bold text-orange-500">{formatLira(totalRemaining)}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Total Outstanding</p>
+            <p className="text-2xl font-bold text-orange-500">{formatLira(totalRemaining)}</p>
+          </div>
+          <button
+            onClick={handlePayAll}
+            disabled={payAllLoading || debts.length === 0 || totalRemaining <= 0}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#1B2D72] text-white hover:bg-[#00AECC] disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+          >
+            {payAllLoading ? "Paying all..." : "Pay All"}
+          </button>
+        </div>
       </div>
 
       {debts.length === 0 ? (
@@ -229,7 +282,7 @@ export default function DebtPage() {
                     </div>
                     <button
                       onClick={() => handlePay(debt)}
-                      disabled={!canPay || paying === debt.id}
+                      disabled={!canPay || paying === debt.id || payAllLoading}
                       className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 whitespace-nowrap"
                     >
                       {paying === debt.id ? "Paying..." : "Pay Now"}
