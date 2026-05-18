@@ -3,10 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import AuthButton from "@/components/auth-button";
-import { FaTimes } from "react-icons/fa";
 import Image from "next/image";
-import { AiOutlineShoppingCart } from "react-icons/ai";
-// import { IoWalletOutline } from "react-icons/io5";
 // import WalletModal from "@/components/WalletModal";
 import { useCart } from "@/context/CartContext";
 // import { useWallet } from "@/context/WalletContext";
@@ -123,7 +120,11 @@ export default function Navbar() {
                 href="/cart"
                 className="relative px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-[#1B2D72] hover:bg-blue-50 transition-all flex items-center gap-1.5"
               >
-                <AiOutlineShoppingCart size={18} />
+                <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="20" cy="21" r="1" />
+                  <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.7L23 6H6" />
+                </svg>
                 Cart
                 {itemCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
@@ -220,7 +221,9 @@ export default function Navbar() {
             onClick={() => setIsMenuOpen(false)}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
           >
-            <FaTimes size={16} />
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -242,7 +245,11 @@ export default function Navbar() {
             onClick={() => setIsMenuOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#1B2D72] transition-colors"
           >
-            <AiOutlineShoppingCart size={17} className="text-gray-400" />
+            <svg className="h-[17px] w-[17px] text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.7L23 6H6" />
+            </svg>
             Cart
             {itemCount > 0 && (
               <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">

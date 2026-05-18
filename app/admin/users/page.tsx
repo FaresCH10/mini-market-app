@@ -31,13 +31,10 @@ export default function ManageUsers() {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('approved', { ascending: true })      // pending first
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      setUsers(data || [])
+      const res = await fetch('/api/admin/users')
+      const body = await res.json() as { users?: Profile[]; error?: string }
+      if (!res.ok) throw new Error(body.error || 'Failed to load users')
+      setUsers(body.users || [])
     } catch { toast.error('Failed to load users') }
     finally { setLoading(false) }
   }
@@ -46,8 +43,12 @@ export default function ManageUsers() {
     setUpdatingId(userId)
     const newRole = currentRole === 'admin' ? 'user' : 'admin'
     try {
-      const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
-      if (error) throw error
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole }),
+      })
+      if (!res.ok) throw new Error('Failed to update role')
       toast.success(`Role updated to ${newRole}`)
       fetchUsers()
     } catch { toast.error('Failed to update role') }
@@ -57,8 +58,12 @@ export default function ManageUsers() {
   const setApproval = async (userId: string, approve: boolean) => {
     setUpdatingId(userId)
     try {
-      const { error } = await supabase.from('profiles').update({ approved: approve }).eq('id', userId)
-      if (error) throw error
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, approved: approve }),
+      })
+      if (!res.ok) throw new Error('Failed to update approval')
       toast.success(approve ? 'User approved' : 'Approval revoked')
       fetchUsers()
     } catch { toast.error('Failed to update approval') }

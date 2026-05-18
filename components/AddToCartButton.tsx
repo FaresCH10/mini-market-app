@@ -7,8 +7,9 @@ type Product = {
   id: string
   name: string
   price: number
+  sell_price?: number | null
   quantity: number
-  image_url?: string
+  image_url?: string | null
 }
 
 export default function AddToCartButton({ product }: { product: Product }) {

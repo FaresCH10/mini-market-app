@@ -82,13 +82,15 @@ const CartIcon = () => (
 type ChatWidgetProps = {
   fabMode?: "chat" | "cart";
   hideFloatingFab?: boolean;
+  initialOpen?: boolean;
 };
 
 export default function ChatWidget({
   fabMode = "chat",
   hideFloatingFab = false,
+  initialOpen = false,
 }: ChatWidgetProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -170,7 +172,7 @@ export default function ChatWidget({
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: updatedMessages, userId }),
+          body: JSON.stringify({ messages: updatedMessages }),
         });
         const data = await res.json() as { message?: string; error?: string; navigate_to?: string; refresh_cart?: boolean; refresh_debt?: boolean };
         setMessages((m) => [...m, { role: "assistant", content: data.message ?? data.error ?? "No response." }]);

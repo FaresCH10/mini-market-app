@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { FaBars, FaTimes } from 'react-icons/fa'
 
 const navItems = [
   {
@@ -188,7 +187,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
         >
-          {isMobileMenuOpen ? <FaTimes size={18} /> : <FaBars size={18} />}
+          {isMobileMenuOpen ? (
+            <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          )}
         </button>
       </div>
 

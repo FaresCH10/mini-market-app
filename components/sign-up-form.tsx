@@ -32,11 +32,14 @@ export function SignUpForm({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
       if (error) throw error;
+      if (data.session) {
+        await fetch("/api/auth/create-profile", { method: "POST" });
+      }
       router.push("/pending-approval?source=signup");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");

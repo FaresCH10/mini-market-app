@@ -2,6 +2,7 @@ import Groq from "groq-sdk";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { formatLira, liraToK } from "@/lib/currency";
+import { createClient as createServerSupabase } from "@/lib/supabase/server";
 
 // ─── Lazy clients — created inside the handler to avoid module-level crashes
 //     if env vars are missing (which would break the entire app startup).
@@ -972,8 +973,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 
-    const { messages, userId } = body as { messages: Groq.Chat.ChatCompletionMessageParam[]; userId: string };
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { messages } = body as { messages: Groq.Chat.ChatCompletionMessageParam[] };
+    if (!Array.isArray(messages)) {
+      return NextResponse.json({ error: "Invalid messages" }, { status: 400 });
+    }
+
+    const authClient = await createServerSupabase();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Initialize clients inside the handler — safe even if env vars are missing (returns 500, not crash)
     const supabase = getSupabase();
@@ -981,13 +990,20 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name, role")
-      .eq("id", userId)
+      .select("name, role, approved")
+      .eq("id", user.id)
       .single();
 
-    const role = (profile as { role: string } | null)?.role ?? "user";
+    const role = (profile as { role: string; approved?: boolean } | null)?.role ?? "user";
     const userName = (profile as { name: string } | null)?.name ?? "there";
     const isAdmin = role === "admin";
+
+    if (!isAdmin && profile?.approved !== true) {
+      return NextResponse.json(
+        { error: "Your account is pending admin approval." },
+        { status: 403 },
+      );
+    }
 
     const tools = isAdmin ? [...USER_TOOLS, ...ADMIN_EXTRA_TOOLS] : USER_TOOLS;
 
@@ -1163,7 +1179,7 @@ ORDER HISTORY
               ? JSON.stringify({
                 error: "Sorry, I couldn't understand that request. Please try again.",
               })
-              : await executeTool(tc.function.name, args, userId, supabase);
+              : await executeTool(tc.function.name, args, user.id, supabase);
             return {
               role: "tool" as const,
               tool_call_id: tc.id,

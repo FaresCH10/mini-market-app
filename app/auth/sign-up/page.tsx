@@ -1,6 +1,5 @@
 import { SignUpForm } from "@/components/sign-up-form";
 import { createClient } from "@/lib/supabase/server";
-import { FaShoppingBag } from "react-icons/fa";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -20,7 +19,10 @@ export default async function Page() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-white/10 rounded-2xl mb-4">
-            <FaShoppingBag className="text-white" size={24} />
+            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 8h12l1 13H5L6 8Z" />
+              <path d="M9 8a3 3 0 0 1 6 0" />
+            </svg>
           </div>
           <h1 className="text-2xl font-bold text-white">NavyBits Market</h1>
           <p className="text-blue-200 text-sm mt-1">Create your account</p>

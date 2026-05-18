@@ -3,7 +3,6 @@ import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import { Suspense } from "react";
 import ChatWidgetLoader from "@/components/ChatWidgetLoader";
-import { Inter } from "next/font/google";
 // import { WalletProvider } from "@/context/WalletContext";
 import { CartProvider } from "@/context/CartContext";
 import ApprovalGuard from "@/components/ApprovalGuard";
@@ -22,16 +21,14 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="font-sans">
+    <html lang="en" data-scroll-behavior="smooth">
+      <body className="font-sans" suppressHydrationWarning>
         {/* <WalletProvider> */}
           <CartProvider>
             <ApprovalGuard />

@@ -285,6 +285,7 @@ export default function CartPage() {
                       src={safeImg(item.image_url)}
                       alt={item.name}
                       fill
+                      sizes="(max-width: 640px) 56px, 64px"
                       className={
                         safeImg(item.image_url) !== MARKET_LOGO_PLACEHOLDER
                           ? "object-cover"

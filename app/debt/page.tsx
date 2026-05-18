@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatLira, kToLira, liraToK } from "@/lib/currency";
+import { useCart } from "@/context/CartContext";
 
 type OrderItem = {
   id: string;
@@ -24,8 +25,9 @@ type DebtOrder = {
 };
 
 export default function DebtPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const { authChecked, userId } = useCart();
 
   const [loading, setLoading] = useState(true);
   const [debts, setDebts] = useState<DebtOrder[]>([]);
@@ -33,14 +35,17 @@ export default function DebtPage() {
   const [paying, setPaying] = useState<string | null>(null);
   const [payAllLoading, setPayAllLoading] = useState(false);
 
-  const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/auth/login"); return; }
+  const fetchData = useCallback(async () => {
+    if (!authChecked) return;
+    if (!userId) {
+      router.push("/auth/login");
+      return;
+    }
 
     const { data: orders } = await supabase
       .from("orders")
       .select(`id, total_price, paid_amount, payment_status, created_at, items:order_items(id, product_name, quantity, price)`)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("type", "dept")
       .neq("payment_status", "paid")
       .order("created_at", { ascending: true });
@@ -54,18 +59,18 @@ export default function DebtPage() {
     }
     setPayAmounts(defaults);
     setLoading(false);
-  };
+  }, [authChecked, router, supabase, userId]);
 
   useEffect(() => {
     fetchData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchData]);
 
   // Re-fetch when the chatbot pays a debt
   useEffect(() => {
     const handler = () => fetchData();
     window.addEventListener("debt-updated", handler);
     return () => window.removeEventListener("debt-updated", handler);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchData]);
 
   const totalRemaining = debts.reduce(
     (sum, d) => sum + (d.total_price - (d.paid_amount ?? 0)),

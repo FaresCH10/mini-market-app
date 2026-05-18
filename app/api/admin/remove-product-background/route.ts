@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
+import { optimizeProductImage } from "@/lib/images/optimize";
+import { uploadToR2 } from "@/lib/r2/client";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-const PRODUCT_IMAGES_BUCKET = "product-images";
 const REMOVE_BG_ENDPOINT = "https://api.remove.bg/v1.0/removebg";
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const OUTPUT_WIDTH = 1600;
 const OUTPUT_HEIGHT = 1600;
-const PRODUCT_SCALE_RATIO = 0.72;
+const PRODUCT_SCALE_RATIO = 0.86;
 const SHADOW_BLUR = 22;
 const SHADOW_OPACITY = 0.35;
 const SHADOW_Y_OFFSET = 28;
@@ -199,28 +200,24 @@ export async function POST(req: NextRequest) {
       .png()
       .toBuffer();
 
-    const filePath = `products/${user.id}/bg-removed-${Date.now()}-${buildSafeFilename(sourceUrl.pathname.split("/").pop() || "product")}.png`;
-    const { error: uploadError } = await supabase.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .upload(filePath, finalWhiteBackgroundPng, {
-        upsert: false,
-        contentType: "image/png",
-        cacheControl: "3600",
+    const filePath = `products/${user.id}/bg-removed-${Date.now()}-${buildSafeFilename(sourceUrl.pathname.split("/").pop() || "product")}.webp`;
+    let publicUrl: string;
+    try {
+      const optimizedImage = await optimizeProductImage(finalWhiteBackgroundPng);
+      const upload = await uploadToR2({
+        key: filePath,
+        body: optimizedImage,
+        contentType: "image/webp",
       });
-
-    if (uploadError) {
+      publicUrl = upload.publicUrl;
+    } catch (uploadError) {
       console.error("[remove-product-background] upload", uploadError);
       return NextResponse.json({ ok: false, error: "Failed to upload processed image." }, { status: 500 });
     }
 
-    const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(filePath);
-    if (!data?.publicUrl) {
-      return NextResponse.json({ ok: false, error: "Failed to build processed image URL." }, { status: 500 });
-    }
-
     return NextResponse.json({
       ok: true,
-      imageUrl: data.publicUrl,
+      imageUrl: publicUrl,
     });
   } catch (error) {
     console.error("[remove-product-background]", error);

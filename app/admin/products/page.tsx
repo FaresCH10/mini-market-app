@@ -14,7 +14,6 @@ type ColumnMap = { name: string; price: string; quantity: string }
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2D72]/20 focus:border-[#1B2D72] transition-all"
 const MARKET_LOGO_PLACEHOLDER = '/favicon.ico'
-const PRODUCT_IMAGES_BUCKET = 'product-images'
 const DEFAULT_EXCHANGE_RATE = 90_000
 const EXCHANGE_RATE_STORAGE_KEY = 'mm_exchange_rate'
 
@@ -436,26 +435,24 @@ export default function ManageProducts() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
     setUploadingImage(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('You must be logged in to upload images')
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      const res = await fetch('/api/admin/product-image-upload', {
+        method: 'POST',
+        body: uploadFormData,
+      })
+      const data = await res.json() as { ok?: boolean; imageUrl?: string; error?: string }
+      if (!res.ok || !data.ok || typeof data.imageUrl !== 'string' || !data.imageUrl.trim()) {
+        throw new Error(data.error ?? 'Failed to upload image')
+      }
 
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-      const baseName = file.name.replace(/\.[^.]+$/, '')
-      const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '-')
-      const normalizedExt = ext === 'jpeg' ? 'jpg' : ext
-      const filePath = `products/${user.id}/${Date.now()}-${safeName}.${normalizedExt}`
-
-      const { error: uploadError } = await supabase.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .upload(filePath, file, { upsert: false, contentType: file.type || 'image/jpeg' })
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(filePath)
-      if (!data?.publicUrl) throw new Error('Failed to get public URL')
-
-      setFormData((prev) => ({ ...prev, image_url: data.publicUrl }))
+      setFormData((prev) => ({ ...prev, image_url: data.imageUrl as string }))
       toast.success('Image uploaded')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown upload error'
